@@ -91,7 +91,7 @@ export class DatabaseStorage implements IStorage {
       ...myMatches.flatMap(m => [m.user1Id, m.user2Id])
     ];
 
-    const uniqueExcludeIds = [...new Set(excludeIds)];
+    const uniqueExcludeIds = Array.from(new Set(excludeIds));
 
     const results = await db.query.profiles.findMany({
       where: and(
@@ -105,14 +105,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createProfile(userId: string, profileData: InsertProfile): Promise<Profile> {
-    const [profile] = await db.insert(profiles).values({ ...profileData, userId }).returning();
+    const values = { ...profileData, userId } as typeof profiles.$inferInsert;
+    const [profile] = await db.insert(profiles).values(values).returning();
     return profile;
   }
 
   async updateProfile(userId: string, updates: Partial<InsertProfile>): Promise<Profile> {
     const existing = await this.getProfileByUserId(userId);
     if (!existing) {
-      const [profile] = await db.insert(profiles).values({ 
+      const newProfile = { 
         ...updates, 
         userId, 
         ageVerified: updates.ageVerified ?? false,
@@ -120,11 +121,13 @@ export class DatabaseStorage implements IStorage {
         isNsfw: updates.isNsfw ?? false,
         isVisible: updates.isVisible ?? true,
         lastActive: new Date()
-      }).returning();
+      } as typeof profiles.$inferInsert;
+      const [profile] = await db.insert(profiles).values(newProfile).returning();
       return profile;
     }
+    const updateData = { ...updates, lastActive: new Date() } as Partial<typeof profiles.$inferInsert>;
     const [updated] = await db.update(profiles)
-      .set({ ...updates, lastActive: new Date() })
+      .set(updateData)
       .where(eq(profiles.userId, userId))
       .returning();
     return updated;
