@@ -45,12 +45,26 @@ export async function registerRoutes(
 
   // List Profiles (Directory)
   app.get(api.profiles.list.path, isAuthenticated, async (req, res) => {
+    const userId = (req.user as any).claims.sub;
+    const myProfile = await storage.getProfileByUserId(userId);
+    
+    if (!myProfile?.ageVerified) {
+      return res.status(403).json({ message: "Age verification required" });
+    }
+
     const profiles = await storage.getAllProfiles();
     res.json(profiles);
   });
 
   // Get Profile by ID
   app.get(api.profiles.get.path, isAuthenticated, async (req, res) => {
+    const userId = (req.user as any).claims.sub;
+    const myProfile = await storage.getProfileByUserId(userId);
+    
+    if (!myProfile?.ageVerified) {
+      return res.status(403).json({ message: "Age verification required" });
+    }
+
     const profile = await storage.getProfile(Number(req.params.id));
     if (!profile) {
       return res.status(404).json({ message: "Profile not found" });

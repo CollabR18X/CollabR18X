@@ -51,11 +51,7 @@ export class DatabaseStorage implements IStorage {
     // Check if profile exists, if not create it (upsert-ish logic for 'me' endpoint flexibility)
     const existing = await this.getProfileByUserId(userId);
     if (!existing) {
-       // Should ideally be create, but strictly update here.
-       // For simplicity, we assume profile is created on first login or handled elsewhere.
-       // Actually, let's just insert if not exists for robustness in 'update' if that's the primary way to edit.
-       // But schema requires userId which we have.
-       const [profile] = await db.insert(profiles).values({ ...updates, userId }).returning();
+       const [profile] = await db.insert(profiles).values({ ...updates, userId, ageVerified: updates.ageVerified ?? false }).returning();
        return profile;
     }
     const [updated] = await db.update(profiles).set(updates).where(eq(profiles.userId, userId)).returning();

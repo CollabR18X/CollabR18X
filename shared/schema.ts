@@ -14,6 +14,7 @@ export const profiles = pgTable("profiles", {
   portfolioUrl: text("portfolio_url"),
   location: text("location"),
   socialLinks: jsonb("social_links").$type<{ instagram?: string; twitter?: string; youtube?: string; tiktok?: string }>(),
+  ageVerified: boolean("age_verified").notNull().default(false),
 });
 
 export const collaborations = pgTable("collaborations", {
