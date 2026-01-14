@@ -61,6 +61,49 @@ export async function registerRoutes(
     res.json(profile);
   });
 
+  app.put("/api/profiles/location", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const schema = z.object({
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+      });
+      const input = schema.parse(req.body);
+      const profile = await storage.updateProfileLocation(userId, input.latitude, input.longitude);
+      res.json(profile);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/profiles/nearby", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const schema = z.object({
+        lat: z.coerce.number().min(-90).max(90),
+        lng: z.coerce.number().min(-180).max(180),
+        maxDistance: z.coerce.number().min(1).max(500).default(50),
+      });
+      const input = schema.parse(req.query);
+      const profiles = await storage.getNearbyProfiles(input.lat, input.lng, input.maxDistance, userId);
+      res.json(profiles);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // === Likes ===
 
   app.post(api.likes.create.path, isAuthenticated, async (req, res) => {

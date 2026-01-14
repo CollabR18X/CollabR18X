@@ -14,6 +14,7 @@ import Profile from "@/pages/Profile";
 import Collaborations from "@/pages/Collaborations";
 import BlockedUsers from "@/pages/BlockedUsers";
 import Chat from "@/pages/Chat";
+import Nearby from "@/pages/Nearby";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -43,6 +44,7 @@ function Router() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/directory" component={Directory} />
+          <Route path="/nearby" component={Nearby} />
           <Route path="/profile/me" component={MyProfile} />
           <Route path="/profile/:id" component={Profile} />
           <Route path="/collaborations" component={Collaborations} />

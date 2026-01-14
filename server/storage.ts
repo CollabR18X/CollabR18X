@@ -20,6 +20,8 @@ export interface IStorage {
   getDiscoverProfiles(userId: string): Promise<(Profile & { user: User; matchScore: number })[]>;
   createProfile(userId: string, profile: InsertProfile): Promise<Profile>;
   updateProfile(userId: string, updates: Partial<InsertProfile>): Promise<Profile>;
+  updateProfileLocation(userId: string, lat: number, lng: number): Promise<Profile>;
+  getNearbyProfiles(lat: number, lng: number, maxDistance: number, userId: string): Promise<(Profile & { user: User; distance: number })[]>;
 
   // Likes
   createLike(likerId: string, likedId: string, isSuperLike?: boolean): Promise<Like>;
@@ -236,6 +238,77 @@ export class DatabaseStorage implements IStorage {
       .where(eq(profiles.userId, userId))
       .returning();
     return updated;
+  }
+
+  async updateProfileLocation(userId: string, lat: number, lng: number): Promise<Profile> {
+    const existing = await this.getProfileByUserId(userId);
+    if (!existing) {
+      const newProfile = { 
+        userId, 
+        latitude: lat,
+        longitude: lng,
+        locationUpdatedAt: new Date(),
+        ageVerified: false,
+        socialsVerified: false,
+        isNsfw: false,
+        isVisible: true,
+        lastActive: new Date()
+      } as typeof profiles.$inferInsert;
+      const [profile] = await db.insert(profiles).values(newProfile).returning();
+      return profile;
+    }
+    const [updated] = await db.update(profiles)
+      .set({ latitude: lat, longitude: lng, locationUpdatedAt: new Date(), lastActive: new Date() })
+      .where(eq(profiles.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  private calculateHaversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = this.toRad(lat2 - lat1);
+    const dLng = this.toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private toRad(deg: number): number {
+    return deg * (Math.PI / 180);
+  }
+
+  async getNearbyProfiles(lat: number, lng: number, maxDistance: number, userId: string): Promise<(Profile & { user: User; distance: number })[]> {
+    const blockedByMe = await db.select({ blockedId: blocks.blockedId }).from(blocks).where(eq(blocks.blockerId, userId));
+    const blockedMe = await db.select({ blockerId: blocks.blockerId }).from(blocks).where(eq(blocks.blockedId, userId));
+    
+    const excludeIds = [
+      userId,
+      ...blockedByMe.map(b => b.blockedId),
+      ...blockedMe.map(b => b.blockerId)
+    ];
+
+    const uniqueExcludeIds = Array.from(new Set(excludeIds));
+
+    const results = await db.query.profiles.findMany({
+      where: and(
+        eq(profiles.isVisible, true),
+        uniqueExcludeIds.length > 0 ? notInArray(profiles.userId, uniqueExcludeIds) : undefined
+      ),
+      with: { user: true },
+    });
+
+    const profilesWithDistance = results
+      .filter(profile => profile.latitude !== null && profile.longitude !== null)
+      .map(profile => {
+        const distance = this.calculateHaversineDistance(lat, lng, profile.latitude!, profile.longitude!);
+        return { ...profile, distance: Math.round(distance * 10) / 10 };
+      })
+      .filter(profile => profile.distance <= maxDistance)
+      .sort((a, b) => a.distance - b.distance);
+
+    return profilesWithDistance as (Profile & { user: User; distance: number })[];
   }
 
   // === Likes ===

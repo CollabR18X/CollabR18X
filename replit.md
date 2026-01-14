@@ -14,6 +14,14 @@ Preferred communication style: Simple, everyday language.
 - **Profile Enhancements**: Added NSFW tagging option, profile visibility toggle, and dating-specific fields (interests, gender, looking for, preferences)
 - **Auto-Save Feature**: Profile changes now save automatically with 2-second debounce, only sending changed fields
 - **Dating Features Backend**: Full API support for likes, mutual matching, messaging, blocking, and reporting users
+- **In-App Chat**: Real-time messaging between matched users with 3-second polling
+- **Geolocation Features**: Nearby users discovery with distance calculations, location sharing, safety features
+- **Privacy Controls**: Users can hide personal information (age, location, birthdate, occupation, education, height)
+- **User Blocking**: Block/unblock users with protection from viewing profiles or sending messages
+
+## Notes
+
+- **Voice/Video Calls**: Twilio integration was dismissed by user. If implementing voice/video calls in the future, will need to either complete the Twilio integration or use alternative service with manual API key setup.
 
 ## System Architecture
 

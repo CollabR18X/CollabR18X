@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar, date, real } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -42,6 +42,9 @@ export const profiles = pgTable("profiles", {
   maxAgePreference: integer("max_age_preference").default(99),
   maxDistance: integer("max_distance").default(100),
   genderPreference: text("gender_preference").array().notNull().default(sql`'{}'::text[]`),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  locationUpdatedAt: timestamp("location_updated_at"),
 });
 
 export const likes = pgTable("likes", {
