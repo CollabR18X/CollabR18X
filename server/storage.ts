@@ -54,6 +54,9 @@ export interface IStorage {
   getCollaborationsForUser(userId: string): Promise<(Collaboration & { requester: User, receiver: User })[]>;
   createCollaboration(requesterId: string, receiverId: string, message: string): Promise<Collaboration>;
   updateCollaborationStatus(id: number, status: string): Promise<Collaboration | undefined>;
+
+  // Similar Interests
+  getSimilarInterestsProfiles(userId: string): Promise<(Profile & { user: User; sharedInterests: string[]; sharedCount: number })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -472,6 +475,55 @@ export class DatabaseStorage implements IStorage {
   async updateCollaborationStatus(id: number, status: string): Promise<Collaboration | undefined> {
     const [updated] = await db.update(collaborations).set({ status }).where(eq(collaborations.id, id)).returning();
     return updated;
+  }
+
+  // === Similar Interests ===
+  async getSimilarInterestsProfiles(userId: string): Promise<(Profile & { user: User; sharedInterests: string[]; sharedCount: number })[]> {
+    const myProfile = await this.getProfileByUserId(userId);
+    const myInterests = myProfile?.interests || [];
+    
+    if (myInterests.length === 0) {
+      return [];
+    }
+
+    // Build exclusion list - always include at least the current user to avoid SQL issues
+    const excludeUserIds = [userId];
+
+    // Add blocked users (both directions)
+    const blockedByMe = await db.select({ blockedId: blocks.blockedId })
+      .from(blocks)
+      .where(eq(blocks.blockerId, userId));
+    const blockedMe = await db.select({ blockerId: blocks.blockerId })
+      .from(blocks)
+      .where(eq(blocks.blockedId, userId));
+
+    excludeUserIds.push(...blockedByMe.map(b => b.blockedId));
+    excludeUserIds.push(...blockedMe.map(b => b.blockerId));
+
+    const results = await db.query.profiles.findMany({
+      where: and(
+        eq(profiles.isVisible, true),
+        notInArray(profiles.userId, excludeUserIds)
+      ),
+      with: { user: true },
+    });
+
+    const myInterestsLower = new Set(myInterests.map(i => i.toLowerCase().trim()));
+    
+    const profilesWithSharedInterests = results
+      .map(profile => {
+        const otherInterests = profile.interests || [];
+        const sharedInterests = otherInterests.filter(i => myInterestsLower.has(i.toLowerCase().trim()));
+        return {
+          ...profile,
+          sharedInterests,
+          sharedCount: sharedInterests.length
+        };
+      })
+      .filter(profile => profile.sharedCount > 0)
+      .sort((a, b) => b.sharedCount - a.sharedCount);
+
+    return profilesWithSharedInterests as (Profile & { user: User; sharedInterests: string[]; sharedCount: number })[];
   }
 }
 

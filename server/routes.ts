@@ -82,6 +82,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/profiles/similar-interests", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const profiles = await storage.getSimilarInterestsProfiles(userId);
+      res.json(profiles);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   app.get("/api/profiles/nearby", isAuthenticated, async (req, res) => {
     try {
       const userId = (req.user as any).claims.sub;

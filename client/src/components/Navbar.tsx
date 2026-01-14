@@ -8,7 +8,8 @@ import {
   UserCircle,
   ShieldOff,
   MessageCircle,
-  MapPin
+  MapPin,
+  Heart
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -27,6 +28,7 @@ export function Navbar() {
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/directory", label: "Directory", icon: Users },
     { href: "/nearby", label: "Nearby", icon: MapPin },
+    { href: "/similar-interests", label: "Similar Interests", icon: Heart },
     { href: "/chat", label: "Messages", icon: MessageCircle },
     { href: "/collaborations", label: "Collabs", icon: SquareUser },
   ];
