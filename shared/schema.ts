@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -16,6 +17,7 @@ export const profiles = pgTable("profiles", {
   socialLinks: jsonb("social_links").$type<{ instagram?: string; twitter?: string; youtube?: string; tiktok?: string }>(),
   ageVerified: boolean("age_verified").notNull().default(false),
   socialsVerified: boolean("socials_verified").notNull().default(false),
+  tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
 });
 
 export const collaborations = pgTable("collaborations", {
