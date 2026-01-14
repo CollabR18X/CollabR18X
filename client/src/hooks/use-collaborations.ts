@@ -79,3 +79,34 @@ export function useUpdateCollaborationStatus() {
     },
   });
 }
+
+export function useAcknowledgeCollaboration() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.collaborations.acknowledge.path, { id });
+      const res = await fetch(url, {
+        method: api.collaborations.acknowledge.method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to acknowledge collaboration");
+      }
+      return api.collaborations.acknowledge.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.collaborations.list.path] });
+      toast({ 
+        title: "Acknowledged!", 
+        description: "You have acknowledged the collaboration terms." 
+      });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+}

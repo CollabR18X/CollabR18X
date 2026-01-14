@@ -204,6 +204,14 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    acknowledge: {
+      method: 'PATCH' as const,
+      path: '/api/collaborations/:id/acknowledge',
+      responses: {
+        200: z.custom<typeof collaborations.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
   },
 };
 

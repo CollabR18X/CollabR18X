@@ -71,3 +71,40 @@ export function useProfile(id: number) {
     enabled: !!id,
   });
 }
+
+export function useLikeProfile() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ likedId, isSuperLike = false }: { likedId: string; isSuperLike?: boolean }) => {
+      const res = await fetch(api.likes.create.path, {
+        method: api.likes.create.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ likedId, isSuperLike }),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        if (res.status === 400) {
+          const error = await res.json();
+          throw new Error(error.message);
+        }
+        throw new Error("Failed to like profile");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.profiles.discover.path] });
+      queryClient.invalidateQueries({ queryKey: [api.likes.received.path] });
+      if (data.match) {
+        toast({ title: "It's a Match!", description: "You both like each other!" });
+      } else {
+        toast({ title: "Liked!", description: "Your interest has been sent." });
+      }
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+}

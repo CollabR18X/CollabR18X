@@ -405,6 +405,29 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/collaborations/:id/acknowledge", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const collabId = Number(req.params.id);
+
+      const collabs = await storage.getCollaborationsForUser(userId);
+      const collab = collabs.find(c => c.id === collabId);
+
+      if (!collab) {
+        return res.status(404).json({ message: "Collaboration not found" });
+      }
+
+      if (collab.status !== 'accepted') {
+        return res.status(400).json({ message: "Can only acknowledge accepted collaborations" });
+      }
+
+      const updated = await storage.acknowledgeCollaboration(collabId, userId);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // === Forum Topics ===
 
   app.get("/api/forums", async (req, res) => {

@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle, Camera, X, Plus, Eye, EyeOff } from "lucide-react";
+import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle, Camera, X, Plus, Eye, EyeOff, Shield, Lock } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
@@ -40,6 +41,21 @@ export default function MyProfile() {
     }
   });
 
+  const [boundaries, setBoundaries] = useState<{
+    contentTypes: string[];
+    communicationPrefs: string[];
+    collaborationTypes: string[];
+    dealBreakers: string[];
+    safetyRequirements: string[];
+  }>({
+    contentTypes: [],
+    communicationPrefs: [],
+    collaborationTypes: [],
+    dealBreakers: [],
+    safetyRequirements: [],
+  });
+  const [dealBreakersText, setDealBreakersText] = useState("");
+
   const form = useForm<InsertProfile & { instagram?: string; twitter?: string; youtube?: string; tiktok?: string }>({
     resolver: zodResolver(insertProfileSchema.extend({})),
     defaultValues: {
@@ -61,12 +77,20 @@ export default function MyProfile() {
         showEducation: true,
         showHeight: true,
       },
+      boundaries: {
+        contentTypes: [],
+        communicationPrefs: [],
+        collaborationTypes: [],
+        dealBreakers: [],
+        safetyRequirements: [],
+      },
     },
   });
 
   useEffect(() => {
     if (profile) {
       const socials = profile.socialLinks as any || {};
+      const profileBoundaries = profile.boundaries as any || {};
       form.reset({
         bio: profile.bio || "",
         niche: profile.niche || "",
@@ -92,6 +116,15 @@ export default function MyProfile() {
         },
       });
       setPhotos(profile.photos || []);
+      const loadedBoundaries = {
+        contentTypes: profileBoundaries.contentTypes || [],
+        communicationPrefs: profileBoundaries.communicationPrefs || [],
+        collaborationTypes: profileBoundaries.collaborationTypes || [],
+        dealBreakers: profileBoundaries.dealBreakers || [],
+        safetyRequirements: profileBoundaries.safetyRequirements || [],
+      };
+      setBoundaries(loadedBoundaries);
+      setDealBreakersText((profileBoundaries.dealBreakers || []).join('\n'));
     }
   }, [profile, form]);
 
@@ -120,6 +153,46 @@ export default function MyProfile() {
         toast({ title: "Photo removed", description: "Your profile photo has been removed." });
       }
     });
+  };
+
+  const saveBoundaries = useCallback((newBoundaries: typeof boundaries) => {
+    setAutoSaveStatus('saving');
+    mutate({ boundaries: newBoundaries }, {
+      onSuccess: () => {
+        setAutoSaveStatus('saved');
+        setTimeout(() => setAutoSaveStatus('idle'), 2000);
+        refetch();
+      },
+      onError: () => {
+        setAutoSaveStatus('idle');
+        toast({
+          title: "Failed to save",
+          description: "Your boundaries could not be saved. Please try again.",
+          variant: "destructive",
+        });
+      }
+    });
+  }, [mutate, toast, refetch]);
+
+  const toggleBoundaryOption = (category: keyof typeof boundaries, value: string) => {
+    const current = boundaries[category] as string[];
+    const newValues = current.includes(value)
+      ? current.filter(v => v !== value)
+      : [...current, value];
+    const newBoundaries = { ...boundaries, [category]: newValues };
+    setBoundaries(newBoundaries);
+    saveBoundaries(newBoundaries);
+  };
+
+  const handleDealBreakersChange = (text: string) => {
+    setDealBreakersText(text);
+  };
+
+  const saveDealBreakers = () => {
+    const dealBreakers = dealBreakersText.split('\n').map(s => s.trim()).filter(Boolean);
+    const newBoundaries = { ...boundaries, dealBreakers };
+    setBoundaries(newBoundaries);
+    saveBoundaries(newBoundaries);
   };
 
   const saveProfile = useCallback((data: any, force = false) => {
@@ -589,6 +662,138 @@ export default function MyProfile() {
               </div>
             </form>
           </Form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/50 shadow-lg mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
+            Boundaries & Safety
+          </CardTitle>
+          <CardDescription>Set your boundaries and safety requirements. These help potential collaborators understand your expectations.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                Content Preferences
+                <span className="text-xs text-muted-foreground font-normal">(Select all that apply)</span>
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {["SFW only", "Mild suggestive", "Adult content OK"].map((option) => (
+                  <label
+                    key={option}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
+                      boundaries.contentTypes.includes(option)
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'bg-muted/30 border-border hover:bg-muted/50'
+                    }`}
+                    data-testid={`checkbox-content-${option.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <Checkbox
+                      checked={boundaries.contentTypes.includes(option)}
+                      onCheckedChange={() => toggleBoundaryOption('contentTypes', option)}
+                    />
+                    <span className="text-sm">{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                Communication Preferences
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {["Text only", "Voice calls OK", "Video calls OK"].map((option) => (
+                  <label
+                    key={option}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
+                      boundaries.communicationPrefs.includes(option)
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'bg-muted/30 border-border hover:bg-muted/50'
+                    }`}
+                    data-testid={`checkbox-comm-${option.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <Checkbox
+                      checked={boundaries.communicationPrefs.includes(option)}
+                      onCheckedChange={() => toggleBoundaryOption('communicationPrefs', option)}
+                    />
+                    <span className="text-sm">{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                Collaboration Types I'm Open To
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {["Photo shoots", "Video collabs", "Live streams", "Promotional"].map((option) => (
+                  <label
+                    key={option}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
+                      boundaries.collaborationTypes.includes(option)
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'bg-muted/30 border-border hover:bg-muted/50'
+                    }`}
+                    data-testid={`checkbox-collab-${option.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <Checkbox
+                      checked={boundaries.collaborationTypes.includes(option)}
+                      onCheckedChange={() => toggleBoundaryOption('collaborationTypes', option)}
+                    />
+                    <span className="text-sm">{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                Safety Requirements
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {["Public location first", "Video call before meeting", "ID verification required"].map((option) => (
+                  <label
+                    key={option}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
+                      boundaries.safetyRequirements.includes(option)
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'bg-muted/30 border-border hover:bg-muted/50'
+                    }`}
+                    data-testid={`checkbox-safety-${option.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <Checkbox
+                      checked={boundaries.safetyRequirements.includes(option)}
+                      onCheckedChange={() => toggleBoundaryOption('safetyRequirements', option)}
+                    />
+                    <span className="text-sm">{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
+                Deal Breakers
+                <span className="text-xs text-muted-foreground font-normal">(One per line)</span>
+              </h4>
+              <Textarea
+                placeholder="List things you won't do or tolerate, one per line..."
+                className="min-h-[100px] resize-none"
+                value={dealBreakersText}
+                onChange={(e) => handleDealBreakersChange(e.target.value)}
+                onBlur={saveDealBreakers}
+                data-testid="input-deal-breakers"
+              />
+              <p className="text-xs text-muted-foreground mt-1">These will be shown to potential collaborators before they can interact with you.</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

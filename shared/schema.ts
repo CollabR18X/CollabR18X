@@ -45,6 +45,14 @@ export const profiles = pgTable("profiles", {
   latitude: real("latitude"),
   longitude: real("longitude"),
   locationUpdatedAt: timestamp("location_updated_at"),
+  boundaries: jsonb("boundaries").$type<{
+    contentTypes?: string[];
+    communicationPrefs?: string[];
+    collaborationTypes?: string[];
+    dealBreakers?: string[];
+    safetyRequirements?: string[];
+  }>().default({}),
+  consentAcknowledgedAt: timestamp("consent_acknowledged_at"),
 });
 
 export const likes = pgTable("likes", {
@@ -96,6 +104,8 @@ export const collaborations = pgTable("collaborations", {
   status: text("status").notNull().default("pending"),
   message: text("message").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  acknowledgedByRequester: boolean("acknowledged_by_requester").notNull().default(false),
+  acknowledgedByReceiver: boolean("acknowledged_by_receiver").notNull().default(false),
 });
 
 export const forumTopics = pgTable("forum_topics", {

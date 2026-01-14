@@ -1,12 +1,15 @@
-import { useProfile } from "@/hooks/use-profiles";
+import { useState } from "react";
+import { useProfile, useLikeProfile } from "@/hooks/use-profiles";
 import { useAuth } from "@/hooks/use-auth";
 import { useBlockUser } from "@/hooks/use-blocks";
 import { CollabRequestModal } from "@/components/CollabRequestModal";
+import { ConsentDialog, useConsentCheck } from "@/components/ConsentDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Globe, Instagram, Twitter, Youtube, ExternalLink, ShieldBan, Loader2, Briefcase, GraduationCap, Ruler, Calendar } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Instagram, Twitter, Youtube, ExternalLink, ShieldBan, Loader2, Briefcase, GraduationCap, Ruler, Calendar, Shield, Lock, AlertTriangle, CheckCircle, Heart, Star } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +28,12 @@ export default function Profile() {
   const { data: profile, isLoading, error } = useProfile(id);
   const { user } = useAuth();
   const { mutate: blockUser, isPending: isBlocking } = useBlockUser();
+  const { mutate: likeProfile, isPending: isLiking } = useLikeProfile();
   const [, setLocation] = useLocation();
+  const [consentDialogOpen, setConsentDialogOpen] = useState(false);
+  const [pendingLikeType, setPendingLikeType] = useState<'like' | 'superlike' | null>(null);
+  
+  const hasConsent = useConsentCheck(profile?.userId || '');
 
   const handleBlock = () => {
     if (profile?.userId) {
@@ -33,6 +41,28 @@ export default function Profile() {
         onSuccess: () => setLocation("/blocked")
       });
     }
+  };
+
+  const handleLikeClick = (isSuperLike: boolean) => {
+    if (!profile?.userId) return;
+    
+    if (hasConsent) {
+      likeProfile({ likedId: profile.userId, isSuperLike });
+    } else {
+      setPendingLikeType(isSuperLike ? 'superlike' : 'like');
+      setConsentDialogOpen(true);
+    }
+  };
+
+  const handleConsentConfirm = () => {
+    if (profile?.userId && pendingLikeType) {
+      likeProfile({ likedId: profile.userId, isSuperLike: pendingLikeType === 'superlike' });
+      setPendingLikeType(null);
+    }
+  };
+
+  const handleConsentCancel = () => {
+    setPendingLikeType(null);
   };
 
   if (isLoading) return <ProfileSkeleton />;
@@ -59,6 +89,15 @@ export default function Profile() {
   const showOccupation = isOwnProfile || privacy.showOccupation !== false;
   const showEducation = isOwnProfile || privacy.showEducation !== false;
   const showHeight = isOwnProfile || privacy.showHeight !== false;
+  const boundaries = profile.boundaries as {
+    contentTypes?: string[];
+    communicationPrefs?: string[];
+    collaborationTypes?: string[];
+    dealBreakers?: string[];
+    safetyRequirements?: string[];
+  } || {};
+  const hasBoundaries = boundaries.contentTypes?.length || boundaries.communicationPrefs?.length || 
+    boundaries.collaborationTypes?.length || boundaries.dealBreakers?.length || boundaries.safetyRequirements?.length;
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -101,9 +140,31 @@ export default function Profile() {
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-4 flex gap-3 w-full md:w-auto">
+              <div className="mt-4 flex flex-wrap gap-3 w-full md:w-auto">
                 {!isOwnProfile ? (
                   <>
+                    <Button 
+                      size="lg" 
+                      variant="outline"
+                      onClick={() => handleLikeClick(false)}
+                      disabled={isLiking}
+                      data-testid="button-like-profile"
+                      className="border-pink-300 text-pink-600 hover:bg-pink-50 hover:text-pink-700 dark:border-pink-700 dark:text-pink-400 dark:hover:bg-pink-900/30"
+                    >
+                      {isLiking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Heart className="h-4 w-4 mr-2" />}
+                      Like
+                    </Button>
+                    <Button 
+                      size="lg" 
+                      variant="outline"
+                      onClick={() => handleLikeClick(true)}
+                      disabled={isLiking}
+                      data-testid="button-superlike-profile"
+                      className="border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/30"
+                    >
+                      {isLiking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Star className="h-4 w-4 mr-2" />}
+                      Super Like
+                    </Button>
                     <CollabRequestModal 
                       receiverId={profile.userId}
                       receiverName={profile.user.firstName || "Creator"}
@@ -151,6 +212,89 @@ export default function Profile() {
                 )}
               </div>
             </div>
+
+            {/* Boundaries Section - Show BEFORE action buttons */}
+            {hasBoundaries && !isOwnProfile && (
+              <Card className="mt-8 border-primary/20 bg-primary/5">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Shield className="h-5 w-5 text-primary" />
+                    Boundaries & Expectations
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {boundaries.contentTypes && boundaries.contentTypes.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2 text-muted-foreground">Content Comfort Level</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {boundaries.contentTypes.map((type: string) => (
+                          <Badge key={type} variant="secondary" className="bg-primary/10 text-primary">
+                            {type}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {boundaries.communicationPrefs && boundaries.communicationPrefs.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2 text-muted-foreground">Communication</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {boundaries.communicationPrefs.map((pref: string) => (
+                          <Badge key={pref} variant="outline">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            {pref}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {boundaries.collaborationTypes && boundaries.collaborationTypes.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2 text-muted-foreground">Open To</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {boundaries.collaborationTypes.map((type: string) => (
+                          <Badge key={type} variant="outline">
+                            {type}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {boundaries.safetyRequirements && boundaries.safetyRequirements.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2 flex items-center gap-1 text-muted-foreground">
+                        <Lock className="h-3 w-3" />
+                        Safety Requirements
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {boundaries.safetyRequirements.map((req: string) => (
+                          <Badge key={req} variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                            {req}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {boundaries.dealBreakers && boundaries.dealBreakers.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2 flex items-center gap-1 text-muted-foreground">
+                        <AlertTriangle className="h-3 w-3 text-orange-500" />
+                        Deal Breakers
+                      </h4>
+                      <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                        {boundaries.dealBreakers.map((item: string, idx: number) => (
+                          <li key={idx}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Content Grid */}
             <div className="grid md:grid-cols-3 gap-8 mt-12">
@@ -236,6 +380,18 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      <ConsentDialog
+        open={consentDialogOpen}
+        onOpenChange={(open) => {
+          setConsentDialogOpen(open);
+          if (!open) handleConsentCancel();
+        }}
+        userId={profile.userId}
+        userName={profile.user.firstName || "Creator"}
+        boundaries={boundaries}
+        onConfirm={handleConsentConfirm}
+      />
     </div>
   );
 }

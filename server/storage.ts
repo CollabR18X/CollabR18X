@@ -61,6 +61,7 @@ export interface IStorage {
   getCollaborationsForUser(userId: string): Promise<(Collaboration & { requester: User, receiver: User })[]>;
   createCollaboration(requesterId: string, receiverId: string, message: string): Promise<Collaboration>;
   updateCollaborationStatus(id: number, status: string): Promise<Collaboration | undefined>;
+  acknowledgeCollaboration(id: number, userId: string): Promise<Collaboration | undefined>;
 
   // Similar Interests
   getSimilarInterestsProfiles(userId: string): Promise<(Profile & { user: User; sharedInterests: string[]; sharedCount: number })[]>;
@@ -565,6 +566,23 @@ export class DatabaseStorage implements IStorage {
 
   async updateCollaborationStatus(id: number, status: string): Promise<Collaboration | undefined> {
     const [updated] = await db.update(collaborations).set({ status }).where(eq(collaborations.id, id)).returning();
+    return updated;
+  }
+
+  async acknowledgeCollaboration(id: number, userId: string): Promise<Collaboration | undefined> {
+    const [collab] = await db.select().from(collaborations).where(eq(collaborations.id, id));
+    if (!collab) return undefined;
+
+    const updates: Partial<{ acknowledgedByRequester: boolean; acknowledgedByReceiver: boolean }> = {};
+    if (collab.requesterId === userId) {
+      updates.acknowledgedByRequester = true;
+    } else if (collab.receiverId === userId) {
+      updates.acknowledgedByReceiver = true;
+    } else {
+      return undefined;
+    }
+
+    const [updated] = await db.update(collaborations).set(updates).where(eq(collaborations.id, id)).returning();
     return updated;
   }
 
