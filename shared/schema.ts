@@ -98,6 +98,73 @@ export const collaborations = pgTable("collaborations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const forumTopics = pgTable("forum_topics", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const forumPosts = pgTable("forum_posts", {
+  id: serial("id").primaryKey(),
+  topicId: integer("topic_id").notNull().references(() => forumTopics.id),
+  authorId: text("author_id").references(() => users.id),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  isAnonymous: boolean("is_anonymous").notNull().default(false),
+  isPinned: boolean("is_pinned").notNull().default(false),
+  likesCount: integer("likes_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const postReplies = pgTable("post_replies", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull().references(() => forumPosts.id),
+  authorId: text("author_id").references(() => users.id),
+  content: text("content").notNull(),
+  isAnonymous: boolean("is_anonymous").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const events = pgTable("events", {
+  id: serial("id").primaryKey(),
+  creatorId: text("creator_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  location: text("location").notNull(),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  eventDate: timestamp("event_date").notNull(),
+  isVirtual: boolean("is_virtual").notNull().default(false),
+  virtualLink: text("virtual_link"),
+  maxAttendees: integer("max_attendees"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eventAttendees = pgTable("event_attendees", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => events.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  status: text("status").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const safetyAlerts = pgTable("safety_alerts", {
+  id: serial("id").primaryKey(),
+  reporterId: text("reporter_id").notNull().references(() => users.id),
+  alertType: text("alert_type").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  evidenceUrls: text("evidence_urls").array().notNull().default(sql`'{}'::text[]`),
+  suspectName: text("suspect_name"),
+  suspectHandle: text("suspect_handle"),
+  isVerified: boolean("is_verified").notNull().default(false),
+  isResolved: boolean("is_resolved").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const profilesRelations = relations(profiles, ({ one }) => ({
   user: one(users, {
     fields: [profiles.userId],
@@ -114,6 +181,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   receivedLikes: many(likes, { relationName: "liked" }),
   sentCollaborations: many(collaborations, { relationName: "requester" }),
   receivedCollaborations: many(collaborations, { relationName: "receiver" }),
+  forumPosts: many(forumPosts, { relationName: "forumPostAuthor" }),
+  postReplies: many(postReplies, { relationName: "postReplyAuthor" }),
+  createdEvents: many(events, { relationName: "eventCreator" }),
+  eventAttendances: many(eventAttendees, { relationName: "eventAttendee" }),
+  safetyAlerts: many(safetyAlerts, { relationName: "safetyAlertReporter" }),
 }));
 
 export const likesRelations = relations(likes, ({ one }) => ({
@@ -193,6 +265,64 @@ export const collaborationsRelations = relations(collaborations, ({ one }) => ({
   }),
 }));
 
+export const forumTopicsRelations = relations(forumTopics, ({ many }) => ({
+  posts: many(forumPosts),
+}));
+
+export const forumPostsRelations = relations(forumPosts, ({ one, many }) => ({
+  topic: one(forumTopics, {
+    fields: [forumPosts.topicId],
+    references: [forumTopics.id],
+  }),
+  author: one(users, {
+    fields: [forumPosts.authorId],
+    references: [users.id],
+    relationName: "forumPostAuthor",
+  }),
+  replies: many(postReplies),
+}));
+
+export const postRepliesRelations = relations(postReplies, ({ one }) => ({
+  post: one(forumPosts, {
+    fields: [postReplies.postId],
+    references: [forumPosts.id],
+  }),
+  author: one(users, {
+    fields: [postReplies.authorId],
+    references: [users.id],
+    relationName: "postReplyAuthor",
+  }),
+}));
+
+export const eventsRelations = relations(events, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [events.creatorId],
+    references: [users.id],
+    relationName: "eventCreator",
+  }),
+  attendees: many(eventAttendees),
+}));
+
+export const eventAttendeesRelations = relations(eventAttendees, ({ one }) => ({
+  event: one(events, {
+    fields: [eventAttendees.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [eventAttendees.userId],
+    references: [users.id],
+    relationName: "eventAttendee",
+  }),
+}));
+
+export const safetyAlertsRelations = relations(safetyAlerts, ({ one }) => ({
+  reporter: one(users, {
+    fields: [safetyAlerts.reporterId],
+    references: [users.id],
+    relationName: "safetyAlertReporter",
+  }),
+}));
+
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, userId: true, lastActive: true });
 export const insertLikeSchema = createInsertSchema(likes).omit({ id: true, likerId: true, createdAt: true });
 export const insertMatchSchema = createInsertSchema(matches).omit({ id: true, createdAt: true });
@@ -200,6 +330,12 @@ export const insertMessageSchema = createInsertSchema(messages).omit({ id: true,
 export const insertBlockSchema = createInsertSchema(blocks).omit({ id: true, blockerId: true, createdAt: true });
 export const insertReportSchema = createInsertSchema(reports).omit({ id: true, reporterId: true, createdAt: true, status: true });
 export const insertCollaborationSchema = createInsertSchema(collaborations).omit({ id: true, requesterId: true, createdAt: true, status: true });
+export const insertForumTopicSchema = createInsertSchema(forumTopics).omit({ id: true, createdAt: true });
+export const insertForumPostSchema = createInsertSchema(forumPosts).omit({ id: true, createdAt: true, updatedAt: true, likesCount: true });
+export const insertPostReplySchema = createInsertSchema(postReplies).omit({ id: true, createdAt: true });
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
+export const insertEventAttendeeSchema = createInsertSchema(eventAttendees).omit({ id: true, createdAt: true });
+export const insertSafetyAlertSchema = createInsertSchema(safetyAlerts).omit({ id: true, createdAt: true, isVerified: true, isResolved: true });
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -215,3 +351,15 @@ export type Report = typeof reports.$inferSelect;
 export type InsertReport = z.infer<typeof insertReportSchema>;
 export type Collaboration = typeof collaborations.$inferSelect;
 export type InsertCollaboration = z.infer<typeof insertCollaborationSchema>;
+export type ForumTopic = typeof forumTopics.$inferSelect;
+export type InsertForumTopic = z.infer<typeof insertForumTopicSchema>;
+export type ForumPost = typeof forumPosts.$inferSelect;
+export type InsertForumPost = z.infer<typeof insertForumPostSchema>;
+export type PostReply = typeof postReplies.$inferSelect;
+export type InsertPostReply = z.infer<typeof insertPostReplySchema>;
+export type Event = typeof events.$inferSelect;
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type EventAttendee = typeof eventAttendees.$inferSelect;
+export type InsertEventAttendee = z.infer<typeof insertEventAttendeeSchema>;
+export type SafetyAlert = typeof safetyAlerts.$inferSelect;
+export type InsertSafetyAlert = z.infer<typeof insertSafetyAlertSchema>;

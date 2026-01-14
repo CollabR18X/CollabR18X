@@ -5,6 +5,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { insertForumTopicSchema, insertForumPostSchema, insertPostReplySchema, insertEventSchema, insertSafetyAlertSchema } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -382,6 +383,327 @@ export async function registerRoutes(
       res.status(500).json({ message: "Internal Server Error" });
     }
   });
+
+  // === Forum Topics ===
+
+  app.get("/api/forums", async (req, res) => {
+    try {
+      const topics = await storage.getForumTopics();
+      res.json(topics);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/forums", isAuthenticated, async (req, res) => {
+    try {
+      const input = insertForumTopicSchema.parse(req.body);
+      const topic = await storage.createForumTopic(input);
+      res.status(201).json(topic);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === Forum Posts ===
+
+  app.get("/api/forums/:topicId/posts", async (req, res) => {
+    try {
+      const topicId = Number(req.params.topicId);
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const offset = req.query.offset ? Number(req.query.offset) : undefined;
+      const posts = await storage.getForumPosts(topicId, { limit, offset });
+      res.json(posts);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/forums/:topicId/posts", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const topicId = Number(req.params.topicId);
+      const input = insertForumPostSchema.parse({ ...req.body, topicId });
+      const authorId = input.isAnonymous ? null : userId;
+      const post = await storage.createForumPost(authorId, input);
+      res.status(201).json(post);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/forums/posts/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const post = await storage.getForumPost(id);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      res.json(post);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.put("/api/forums/posts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const id = Number(req.params.id);
+      const schema = z.object({
+        title: z.string().min(1).optional(),
+        content: z.string().min(1).optional()
+      });
+      const input = schema.parse(req.body);
+      const post = await storage.updateForumPost(id, userId, input);
+      if (!post) {
+        return res.status(403).json({ message: "Not authorized to update this post" });
+      }
+      res.json(post);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete("/api/forums/posts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const id = Number(req.params.id);
+      const success = await storage.deleteForumPost(id, userId);
+      if (!success) {
+        return res.status(403).json({ message: "Not authorized to delete this post" });
+      }
+      res.json({ success });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/forums/posts/:id/like", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const post = await storage.likeForumPost(id);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      res.json(post);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === Post Replies ===
+
+  app.post("/api/forums/posts/:id/replies", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const postId = Number(req.params.id);
+      const input = insertPostReplySchema.parse({ ...req.body, postId });
+      const authorId = input.isAnonymous ? null : userId;
+      const reply = await storage.createPostReply(authorId, input);
+      res.status(201).json(reply);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete("/api/forums/replies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const id = Number(req.params.id);
+      const success = await storage.deletePostReply(id, userId);
+      if (!success) {
+        return res.status(403).json({ message: "Not authorized to delete this reply" });
+      }
+      res.json({ success });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === Events ===
+
+  app.get("/api/events", async (req, res) => {
+    try {
+      const filters: { startDate?: Date; endDate?: Date; isVirtual?: boolean } = {};
+      if (req.query.startDate) {
+        filters.startDate = new Date(req.query.startDate as string);
+      }
+      if (req.query.endDate) {
+        filters.endDate = new Date(req.query.endDate as string);
+      }
+      if (req.query.isVirtual !== undefined) {
+        filters.isVirtual = req.query.isVirtual === 'true';
+      }
+      const events = await storage.getEvents(filters);
+      res.json(events);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/events", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const input = insertEventSchema.omit({ creatorId: true }).parse(req.body);
+      const event = await storage.createEvent(userId, { ...input, creatorId: userId });
+      res.status(201).json(event);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/events/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const event = await storage.getEvent(id);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.put("/api/events/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const id = Number(req.params.id);
+      const input = insertEventSchema.omit({ creatorId: true }).partial().parse(req.body);
+      const event = await storage.updateEvent(id, userId, input);
+      if (!event) {
+        return res.status(403).json({ message: "Not authorized to update this event" });
+      }
+      res.json(event);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete("/api/events/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const id = Number(req.params.id);
+      const success = await storage.deleteEvent(id, userId);
+      if (!success) {
+        return res.status(403).json({ message: "Not authorized to delete this event" });
+      }
+      res.json({ success });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/events/:id/rsvp", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const eventId = Number(req.params.id);
+      const schema = z.object({
+        status: z.enum(["going", "maybe", "not_going"])
+      });
+      const input = schema.parse(req.body);
+      const attendee = await storage.rsvpEvent(eventId, userId, input.status);
+      res.json(attendee);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === Safety Alerts ===
+
+  app.get("/api/safety-alerts", async (req, res) => {
+    try {
+      const filters: { alertType?: string; isVerified?: boolean; isResolved?: boolean } = {};
+      if (req.query.alertType) {
+        filters.alertType = req.query.alertType as string;
+      }
+      if (req.query.isVerified !== undefined) {
+        filters.isVerified = req.query.isVerified === 'true';
+      }
+      if (req.query.isResolved !== undefined) {
+        filters.isResolved = req.query.isResolved === 'true';
+      }
+      const alerts = await storage.getSafetyAlerts(filters);
+      res.json(alerts);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/safety-alerts", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const input = insertSafetyAlertSchema.omit({ reporterId: true }).parse(req.body);
+      const alert = await storage.createSafetyAlert(userId, { ...input, reporterId: userId });
+      res.status(201).json(alert);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/safety-alerts/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const alert = await storage.getSafetyAlert(id);
+      if (!alert) {
+        return res.status(404).json({ message: "Safety alert not found" });
+      }
+      res.json(alert);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Seed forum topics on startup
+  await storage.seedForumTopics();
 
   return httpServer;
 }

@@ -1,6 +1,7 @@
 import { db } from "./db";
 import {
   profiles, collaborations, users, likes, matches, messages, blocks, reports,
+  forumTopics, forumPosts, postReplies, events, eventAttendees, safetyAlerts,
   type Profile, type InsertProfile,
   type Collaboration, type InsertCollaboration,
   type User,
@@ -8,9 +9,15 @@ import {
   type Match, type InsertMatch,
   type Message, type InsertMessage,
   type Block, type InsertBlock,
-  type Report, type InsertReport
+  type Report, type InsertReport,
+  type ForumTopic, type InsertForumTopic,
+  type ForumPost, type InsertForumPost,
+  type PostReply, type InsertPostReply,
+  type Event, type InsertEvent,
+  type EventAttendee, type InsertEventAttendee,
+  type SafetyAlert, type InsertSafetyAlert
 } from "@shared/schema";
-import { eq, or, and, desc, ne, notInArray, sql } from "drizzle-orm";
+import { eq, or, and, desc, ne, notInArray, sql, gte, lte, asc, count } from "drizzle-orm";
 
 export interface IStorage {
   // Profiles
@@ -57,6 +64,41 @@ export interface IStorage {
 
   // Similar Interests
   getSimilarInterestsProfiles(userId: string): Promise<(Profile & { user: User; sharedInterests: string[]; sharedCount: number })[]>;
+
+  // Forum Topics
+  getForumTopics(): Promise<(ForumTopic & { postCount: number })[]>;
+  getForumTopic(id: number): Promise<(ForumTopic & { postCount: number }) | undefined>;
+  createForumTopic(data: InsertForumTopic): Promise<ForumTopic>;
+
+  // Forum Posts
+  getForumPosts(topicId: number, options?: { limit?: number; offset?: number }): Promise<(ForumPost & { author: User | null; replyCount: number })[]>;
+  getForumPost(id: number): Promise<(ForumPost & { author: User | null; replies: (PostReply & { author: User | null })[] }) | undefined>;
+  createForumPost(authorId: string | null, data: InsertForumPost): Promise<ForumPost>;
+  updateForumPost(id: number, userId: string, data: Partial<Pick<ForumPost, 'title' | 'content'>>): Promise<ForumPost | undefined>;
+  deleteForumPost(id: number, userId: string): Promise<boolean>;
+  likeForumPost(postId: number): Promise<ForumPost | undefined>;
+
+  // Post Replies
+  createPostReply(authorId: string | null, data: InsertPostReply): Promise<PostReply>;
+  deletePostReply(id: number, userId: string): Promise<boolean>;
+
+  // Events
+  getEvents(filters?: { startDate?: Date; endDate?: Date; isVirtual?: boolean }): Promise<(Event & { creator: User; attendeeCount: number })[]>;
+  getEvent(id: number): Promise<(Event & { creator: User; attendees: (EventAttendee & { user: User })[] }) | undefined>;
+  createEvent(creatorId: string, data: InsertEvent): Promise<Event>;
+  updateEvent(id: number, creatorId: string, data: Partial<InsertEvent>): Promise<Event | undefined>;
+  deleteEvent(id: number, creatorId: string): Promise<boolean>;
+  rsvpEvent(eventId: number, userId: string, status: string): Promise<EventAttendee>;
+
+  // Safety Alerts
+  getSafetyAlerts(filters?: { alertType?: string; isVerified?: boolean; isResolved?: boolean }): Promise<(SafetyAlert & { reporter: User })[]>;
+  getSafetyAlert(id: number): Promise<(SafetyAlert & { reporter: User }) | undefined>;
+  createSafetyAlert(reporterId: string, data: InsertSafetyAlert): Promise<SafetyAlert>;
+  verifySafetyAlert(id: number): Promise<SafetyAlert | undefined>;
+  resolveSafetyAlert(id: number): Promise<SafetyAlert | undefined>;
+
+  // Seed Data
+  seedForumTopics(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -524,6 +566,297 @@ export class DatabaseStorage implements IStorage {
       .sort((a, b) => b.sharedCount - a.sharedCount);
 
     return profilesWithSharedInterests as (Profile & { user: User; sharedInterests: string[]; sharedCount: number })[];
+  }
+
+  // === Forum Topics ===
+  async getForumTopics(): Promise<(ForumTopic & { postCount: number })[]> {
+    const topics = await db.select().from(forumTopics).orderBy(forumTopics.id);
+    const topicsWithCounts = await Promise.all(
+      topics.map(async (topic) => {
+        const [result] = await db.select({ count: count() }).from(forumPosts).where(eq(forumPosts.topicId, topic.id));
+        return { ...topic, postCount: result?.count || 0 };
+      })
+    );
+    return topicsWithCounts;
+  }
+
+  async getForumTopic(id: number): Promise<(ForumTopic & { postCount: number }) | undefined> {
+    const [topic] = await db.select().from(forumTopics).where(eq(forumTopics.id, id));
+    if (!topic) return undefined;
+    const [result] = await db.select({ count: count() }).from(forumPosts).where(eq(forumPosts.topicId, id));
+    return { ...topic, postCount: result?.count || 0 };
+  }
+
+  async createForumTopic(data: InsertForumTopic): Promise<ForumTopic> {
+    const [topic] = await db.insert(forumTopics).values(data).returning();
+    return topic;
+  }
+
+  // === Forum Posts ===
+  async getForumPosts(topicId: number, options?: { limit?: number; offset?: number }): Promise<(ForumPost & { author: User | null; replyCount: number })[]> {
+    const limit = options?.limit || 50;
+    const offset = options?.offset || 0;
+    
+    const results = await db.query.forumPosts.findMany({
+      where: eq(forumPosts.topicId, topicId),
+      with: { author: true },
+      orderBy: [desc(forumPosts.isPinned), desc(forumPosts.createdAt)],
+      limit,
+      offset
+    });
+
+    const postsWithReplyCounts = await Promise.all(
+      results.map(async (post) => {
+        const [result] = await db.select({ count: count() }).from(postReplies).where(eq(postReplies.postId, post.id));
+        return {
+          ...post,
+          author: post.isAnonymous ? null : post.author,
+          replyCount: result?.count || 0
+        };
+      })
+    );
+
+    return postsWithReplyCounts as (ForumPost & { author: User | null; replyCount: number })[];
+  }
+
+  async getForumPost(id: number): Promise<(ForumPost & { author: User | null; replies: (PostReply & { author: User | null })[] }) | undefined> {
+    const result = await db.query.forumPosts.findFirst({
+      where: eq(forumPosts.id, id),
+      with: {
+        author: true,
+        replies: {
+          with: { author: true },
+          orderBy: [asc(postReplies.createdAt)]
+        }
+      }
+    });
+
+    if (!result) return undefined;
+
+    const processedReplies = result.replies.map(reply => ({
+      ...reply,
+      author: reply.isAnonymous ? null : reply.author
+    }));
+
+    return {
+      ...result,
+      author: result.isAnonymous ? null : result.author,
+      replies: processedReplies
+    } as ForumPost & { author: User | null; replies: (PostReply & { author: User | null })[] };
+  }
+
+  async createForumPost(authorId: string | null, data: InsertForumPost): Promise<ForumPost> {
+    const [post] = await db.insert(forumPosts).values({
+      ...data,
+      authorId: data.isAnonymous ? null : authorId
+    }).returning();
+    return post;
+  }
+
+  async updateForumPost(id: number, userId: string, data: Partial<Pick<ForumPost, 'title' | 'content'>>): Promise<ForumPost | undefined> {
+    const [post] = await db.select().from(forumPosts).where(eq(forumPosts.id, id));
+    if (!post || post.authorId !== userId) return undefined;
+    
+    const [updated] = await db.update(forumPosts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(forumPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteForumPost(id: number, userId: string): Promise<boolean> {
+    const [post] = await db.select().from(forumPosts).where(eq(forumPosts.id, id));
+    if (!post || post.authorId !== userId) return false;
+    
+    await db.delete(postReplies).where(eq(postReplies.postId, id));
+    const [deleted] = await db.delete(forumPosts).where(eq(forumPosts.id, id)).returning();
+    return !!deleted;
+  }
+
+  async likeForumPost(postId: number): Promise<ForumPost | undefined> {
+    const [updated] = await db.update(forumPosts)
+      .set({ likesCount: sql`${forumPosts.likesCount} + 1` })
+      .where(eq(forumPosts.id, postId))
+      .returning();
+    return updated;
+  }
+
+  // === Post Replies ===
+  async createPostReply(authorId: string | null, data: InsertPostReply): Promise<PostReply> {
+    const [reply] = await db.insert(postReplies).values({
+      ...data,
+      authorId: data.isAnonymous ? null : authorId
+    }).returning();
+    return reply;
+  }
+
+  async deletePostReply(id: number, userId: string): Promise<boolean> {
+    const [reply] = await db.select().from(postReplies).where(eq(postReplies.id, id));
+    if (!reply || reply.authorId !== userId) return false;
+    
+    const [deleted] = await db.delete(postReplies).where(eq(postReplies.id, id)).returning();
+    return !!deleted;
+  }
+
+  // === Events ===
+  async getEvents(filters?: { startDate?: Date; endDate?: Date; isVirtual?: boolean }): Promise<(Event & { creator: User; attendeeCount: number })[]> {
+    const conditions = [];
+    if (filters?.startDate) {
+      conditions.push(gte(events.eventDate, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(events.eventDate, filters.endDate));
+    }
+    if (filters?.isVirtual !== undefined) {
+      conditions.push(eq(events.isVirtual, filters.isVirtual));
+    }
+
+    const results = await db.query.events.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      with: { creator: true },
+      orderBy: [asc(events.eventDate)]
+    });
+
+    const eventsWithCounts = await Promise.all(
+      results.map(async (event) => {
+        const [result] = await db.select({ count: count() }).from(eventAttendees).where(eq(eventAttendees.eventId, event.id));
+        return { ...event, attendeeCount: result?.count || 0 };
+      })
+    );
+
+    return eventsWithCounts as (Event & { creator: User; attendeeCount: number })[];
+  }
+
+  async getEvent(id: number): Promise<(Event & { creator: User; attendees: (EventAttendee & { user: User })[] }) | undefined> {
+    const result = await db.query.events.findFirst({
+      where: eq(events.id, id),
+      with: {
+        creator: true,
+        attendees: {
+          with: { user: true }
+        }
+      }
+    });
+    return result as (Event & { creator: User; attendees: (EventAttendee & { user: User })[] }) | undefined;
+  }
+
+  async createEvent(creatorId: string, data: InsertEvent): Promise<Event> {
+    const [event] = await db.insert(events).values({
+      ...data,
+      creatorId
+    }).returning();
+    return event;
+  }
+
+  async updateEvent(id: number, creatorId: string, data: Partial<InsertEvent>): Promise<Event | undefined> {
+    const [event] = await db.select().from(events).where(eq(events.id, id));
+    if (!event || event.creatorId !== creatorId) return undefined;
+    
+    const [updated] = await db.update(events)
+      .set(data)
+      .where(eq(events.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEvent(id: number, creatorId: string): Promise<boolean> {
+    const [event] = await db.select().from(events).where(eq(events.id, id));
+    if (!event || event.creatorId !== creatorId) return false;
+    
+    await db.delete(eventAttendees).where(eq(eventAttendees.eventId, id));
+    const [deleted] = await db.delete(events).where(eq(events.id, id)).returning();
+    return !!deleted;
+  }
+
+  async rsvpEvent(eventId: number, userId: string, status: string): Promise<EventAttendee> {
+    const [existing] = await db.select().from(eventAttendees).where(
+      and(eq(eventAttendees.eventId, eventId), eq(eventAttendees.userId, userId))
+    );
+
+    if (existing) {
+      const [updated] = await db.update(eventAttendees)
+        .set({ status })
+        .where(eq(eventAttendees.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    const [attendee] = await db.insert(eventAttendees).values({
+      eventId,
+      userId,
+      status
+    }).returning();
+    return attendee;
+  }
+
+  // === Safety Alerts ===
+  async getSafetyAlerts(filters?: { alertType?: string; isVerified?: boolean; isResolved?: boolean }): Promise<(SafetyAlert & { reporter: User })[]> {
+    const conditions = [];
+    if (filters?.alertType) {
+      conditions.push(eq(safetyAlerts.alertType, filters.alertType));
+    }
+    if (filters?.isVerified !== undefined) {
+      conditions.push(eq(safetyAlerts.isVerified, filters.isVerified));
+    }
+    if (filters?.isResolved !== undefined) {
+      conditions.push(eq(safetyAlerts.isResolved, filters.isResolved));
+    }
+
+    const results = await db.query.safetyAlerts.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      with: { reporter: true },
+      orderBy: [desc(safetyAlerts.createdAt)]
+    });
+
+    return results as (SafetyAlert & { reporter: User })[];
+  }
+
+  async getSafetyAlert(id: number): Promise<(SafetyAlert & { reporter: User }) | undefined> {
+    const result = await db.query.safetyAlerts.findFirst({
+      where: eq(safetyAlerts.id, id),
+      with: { reporter: true }
+    });
+    return result as (SafetyAlert & { reporter: User }) | undefined;
+  }
+
+  async createSafetyAlert(reporterId: string, data: InsertSafetyAlert): Promise<SafetyAlert> {
+    const [alert] = await db.insert(safetyAlerts).values({
+      ...data,
+      reporterId
+    }).returning();
+    return alert;
+  }
+
+  async verifySafetyAlert(id: number): Promise<SafetyAlert | undefined> {
+    const [updated] = await db.update(safetyAlerts)
+      .set({ isVerified: true })
+      .where(eq(safetyAlerts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async resolveSafetyAlert(id: number): Promise<SafetyAlert | undefined> {
+    const [updated] = await db.update(safetyAlerts)
+      .set({ isResolved: true })
+      .where(eq(safetyAlerts.id, id))
+      .returning();
+    return updated;
+  }
+
+  // === Seed Data ===
+  async seedForumTopics(): Promise<void> {
+    const existingTopics = await db.select().from(forumTopics);
+    if (existingTopics.length > 0) return;
+
+    const defaultTopics = [
+      { name: "Collabs & Networking", description: "Find collaborators and connect with other creators", icon: "Users" },
+      { name: "Content Tips", description: "Share and discover content creation tips and tricks", icon: "Lightbulb" },
+      { name: "Brand Deals", description: "Discuss brand partnerships and sponsorship opportunities", icon: "Briefcase" },
+      { name: "Platform Updates", description: "Stay updated on platform news and changes", icon: "Bell" },
+      { name: "Off Topic", description: "General discussions and community chat", icon: "MessageCircle" }
+    ];
+
+    await db.insert(forumTopics).values(defaultTopics);
   }
 }
 
