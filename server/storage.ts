@@ -17,7 +17,7 @@ export interface IStorage {
   getProfile(id: number): Promise<(Profile & { user: User }) | undefined>;
   getProfileByUserId(userId: string): Promise<Profile | undefined>;
   getAllProfiles(): Promise<(Profile & { user: User })[]>;
-  getDiscoverProfiles(userId: string): Promise<(Profile & { user: User })[]>;
+  getDiscoverProfiles(userId: string): Promise<(Profile & { user: User; matchScore: number })[]>;
   createProfile(userId: string, profile: InsertProfile): Promise<Profile>;
   updateProfile(userId: string, updates: Partial<InsertProfile>): Promise<Profile>;
 
@@ -77,7 +77,8 @@ export class DatabaseStorage implements IStorage {
     return results as (Profile & { user: User })[];
   }
 
-  async getDiscoverProfiles(userId: string): Promise<(Profile & { user: User })[]> {
+  async getDiscoverProfiles(userId: string): Promise<(Profile & { user: User; matchScore: number })[]> {
+    const myProfile = await this.getProfileByUserId(userId);
     const blockedByMe = await db.select({ blockedId: blocks.blockedId }).from(blocks).where(eq(blocks.blockerId, userId));
     const blockedMe = await db.select({ blockerId: blocks.blockerId }).from(blocks).where(eq(blocks.blockedId, userId));
     const likedByMe = await db.select({ likedId: likes.likedId }).from(likes).where(eq(likes.likerId, userId));
@@ -99,9 +100,113 @@ export class DatabaseStorage implements IStorage {
         uniqueExcludeIds.length > 0 ? notInArray(profiles.userId, uniqueExcludeIds) : undefined
       ),
       with: { user: true },
-      orderBy: desc(profiles.lastActive)
     });
-    return results as (Profile & { user: User })[];
+
+    const scoredProfiles = results.map(profile => {
+      const score = this.calculateMatchScore(myProfile, profile);
+      return { ...profile, matchScore: score };
+    });
+
+    scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
+    
+    return scoredProfiles as (Profile & { user: User; matchScore: number })[];
+  }
+
+  private calculateMatchScore(myProfile: Profile | undefined, otherProfile: Profile): number {
+    if (!myProfile) return 50;
+    
+    let score = 0;
+    const weights = {
+      location: 20,
+      interests: 30,
+      genderPreference: 25,
+      agePreference: 15,
+      relationshipType: 10
+    };
+
+    if (myProfile.location && otherProfile.location) {
+      const myLoc = myProfile.location.toLowerCase().trim();
+      const otherLoc = otherProfile.location.toLowerCase().trim();
+      if (myLoc === otherLoc) {
+        score += weights.location;
+      } else {
+        const myParts = myLoc.split(/[,\s]+/).filter(Boolean);
+        const otherParts = otherLoc.split(/[,\s]+/).filter(Boolean);
+        const commonParts = myParts.filter(p => otherParts.some(op => op.includes(p) || p.includes(op)));
+        if (commonParts.length > 0) {
+          score += weights.location * (commonParts.length / Math.max(myParts.length, otherParts.length));
+        }
+      }
+    }
+
+    const myInterests = myProfile.interests || [];
+    const otherInterests = otherProfile.interests || [];
+    if (myInterests.length > 0 && otherInterests.length > 0) {
+      const mySet = new Set(myInterests.map(i => i.toLowerCase().trim()));
+      const matchingInterests = otherInterests.filter(i => mySet.has(i.toLowerCase().trim()));
+      const interestScore = matchingInterests.length / Math.max(myInterests.length, 1);
+      score += weights.interests * Math.min(interestScore * 1.5, 1);
+    }
+
+    const myGenderPref = myProfile.genderPreference || [];
+    const otherGender = otherProfile.gender?.toLowerCase().trim();
+    const otherGenderPref = otherProfile.genderPreference || [];
+    const myGender = myProfile.gender?.toLowerCase().trim();
+    
+    let genderMatch = true;
+    if (myGenderPref.length > 0 && otherGender) {
+      genderMatch = myGenderPref.some(g => g.toLowerCase().trim() === otherGender);
+    }
+    if (genderMatch && otherGenderPref.length > 0 && myGender) {
+      genderMatch = otherGenderPref.some(g => g.toLowerCase().trim() === myGender);
+    }
+    if (genderMatch) {
+      score += weights.genderPreference;
+    }
+
+    const calculateAge = (birthDate: string | Date | null): number | null => {
+      if (!birthDate) return null;
+      const birth = new Date(birthDate);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
+    const myAge = calculateAge(myProfile.birthDate);
+    const otherAge = calculateAge(otherProfile.birthDate);
+    
+    let ageMatch = true;
+    if (otherAge !== null) {
+      const myMinAge = myProfile.minAgePreference || 18;
+      const myMaxAge = myProfile.maxAgePreference || 99;
+      if (otherAge < myMinAge || otherAge > myMaxAge) {
+        ageMatch = false;
+      }
+    }
+    if (ageMatch && myAge !== null) {
+      const otherMinAge = otherProfile.minAgePreference || 18;
+      const otherMaxAge = otherProfile.maxAgePreference || 99;
+      if (myAge < otherMinAge || myAge > otherMaxAge) {
+        ageMatch = false;
+      }
+    }
+    if (ageMatch) {
+      score += weights.agePreference;
+    }
+
+    if (myProfile.relationshipType && otherProfile.relationshipType) {
+      if (myProfile.relationshipType.toLowerCase() === otherProfile.relationshipType.toLowerCase()) {
+        score += weights.relationshipType;
+      }
+    } else {
+      score += weights.relationshipType * 0.5;
+    }
+
+    return Math.round(score);
   }
 
   async createProfile(userId: string, profileData: InsertProfile): Promise<Profile> {

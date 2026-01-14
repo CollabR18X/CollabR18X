@@ -13,6 +13,7 @@ import MyProfile from "@/pages/MyProfile";
 import Profile from "@/pages/Profile";
 import Collaborations from "@/pages/Collaborations";
 import BlockedUsers from "@/pages/BlockedUsers";
+import Chat from "@/pages/Chat";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -45,6 +46,8 @@ function Router() {
           <Route path="/profile/me" component={MyProfile} />
           <Route path="/profile/:id" component={Profile} />
           <Route path="/collaborations" component={Collaborations} />
+          <Route path="/chat" component={Chat} />
+          <Route path="/chat/:matchId" component={Chat} />
           <Route path="/blocked" component={BlockedUsers} />
           <Route component={NotFound} />
         </Switch>
