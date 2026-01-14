@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { 
   Users, 
+  Users2,
   LayoutDashboard, 
   SquareUser, 
   LogOut, 
@@ -9,7 +10,12 @@ import {
   ShieldOff,
   MessageCircle,
   MapPin,
-  Heart
+  Heart,
+  MessageSquare,
+  Calendar,
+  Building,
+  Shield,
+  ChevronDown
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -42,19 +48,63 @@ export function Navbar() {
           </span>
         </Link>
         
-        <div className="hidden md:flex md:space-x-6">
+        <div className="hidden md:flex md:space-x-1 md:items-center">
           {navItems.map((item) => (
             <Link 
               key={item.href} 
               href={item.href}
-              className={`flex items-center space-x-2 text-sm font-medium transition-colors hover:text-primary ${
-                location === item.href ? "text-primary" : "text-muted-foreground"
+              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:text-primary ${
+                location === item.href ? "text-primary bg-muted/50" : "text-muted-foreground"
               }`}
             >
               <item.icon className="h-4 w-4" />
               <span>{item.label}</span>
             </Link>
           ))}
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger className="focus:outline-none">
+              <div className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+                location.startsWith("/community") ? "text-primary bg-muted/50" : "text-muted-foreground hover:text-primary"
+              }`}>
+                <Users2 className="h-4 w-4" />
+                <span>Community</span>
+                <ChevronDown className="h-4 w-4 ml-1 transition-transform group-data-[state=open]:rotate-180" />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48" data-testid="community-dropdown">
+              <Link href="/community">
+                <DropdownMenuItem className="cursor-pointer flex items-center" data-testid="menu-community-home">
+                  <Users2 className="mr-2 h-4 w-4" />
+                  Community Home
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/community/forums">
+                <DropdownMenuItem className="cursor-pointer flex items-center" data-testid="menu-forums">
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Forums
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/community/events">
+                <DropdownMenuItem className="cursor-pointer flex items-center" data-testid="menu-events">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Events
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/community/hubs">
+                <DropdownMenuItem className="cursor-pointer flex items-center" data-testid="menu-hubs">
+                  <Building className="mr-2 h-4 w-4" />
+                  Local Hubs
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/community/safety">
+                <DropdownMenuItem className="cursor-pointer flex items-center" data-testid="menu-safety">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Safety Alerts
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="ml-auto flex items-center space-x-4">

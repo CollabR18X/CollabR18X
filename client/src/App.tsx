@@ -16,6 +16,11 @@ import BlockedUsers from "@/pages/BlockedUsers";
 import Chat from "@/pages/Chat";
 import Nearby from "@/pages/Nearby";
 import SimilarInterests from "@/pages/SimilarInterests";
+import Forums from "@/pages/Forums";
+import Events from "@/pages/Events";
+import SafetyAlerts from "@/pages/SafetyAlerts";
+import LocalHubs from "@/pages/LocalHubs";
+import Community from "@/pages/Community";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -53,6 +58,16 @@ function Router() {
           <Route path="/chat" component={Chat} />
           <Route path="/chat/:matchId" component={Chat} />
           <Route path="/blocked" component={BlockedUsers} />
+          <Route path="/community" component={Community} />
+          <Route path="/community/forums" component={Forums} />
+          <Route path="/community/forums/:topicId" component={Forums} />
+          <Route path="/community/forums/posts/:postId" component={Forums} />
+          <Route path="/community/events" component={Events} />
+          <Route path="/community/events/:id" component={Events} />
+          <Route path="/community/safety" component={SafetyAlerts} />
+          <Route path="/community/safety/:id" component={SafetyAlerts} />
+          <Route path="/community/hubs" component={LocalHubs} />
+          <Route path="/community/hubs/:location" component={LocalHubs} />
           <Route component={NotFound} />
         </Switch>
       </main>

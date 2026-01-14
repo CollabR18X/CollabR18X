@@ -65,6 +65,10 @@ export interface IStorage {
   // Similar Interests
   getSimilarInterestsProfiles(userId: string): Promise<(Profile & { user: User; sharedInterests: string[]; sharedCount: number })[]>;
 
+  // Location Hubs
+  getProfilesByLocation(): Promise<{ location: string; count: number; profiles: (Profile & { user: User })[] }[]>;
+  getProfilesInLocation(location: string): Promise<(Profile & { user: User })[]>;
+
   // Forum Topics
   getForumTopics(): Promise<(ForumTopic & { postCount: number })[]>;
   getForumTopic(id: number): Promise<(ForumTopic & { postCount: number }) | undefined>;
@@ -354,6 +358,51 @@ export class DatabaseStorage implements IStorage {
       .sort((a, b) => a.distance - b.distance);
 
     return profilesWithDistance as (Profile & { user: User; distance: number })[];
+  }
+
+  // === Location Hubs ===
+  async getProfilesByLocation(): Promise<{ location: string; count: number; profiles: (Profile & { user: User })[] }[]> {
+    const results = await db.query.profiles.findMany({
+      where: and(
+        eq(profiles.isVisible, true),
+        sql`${profiles.location} IS NOT NULL AND ${profiles.location} != ''`
+      ),
+      with: { user: true },
+    });
+
+    const locationMap = new Map<string, (Profile & { user: User })[]>();
+    
+    for (const profile of results) {
+      const location = profile.location?.trim();
+      if (location) {
+        if (!locationMap.has(location)) {
+          locationMap.set(location, []);
+        }
+        locationMap.get(location)!.push(profile as Profile & { user: User });
+      }
+    }
+
+    const hubs = Array.from(locationMap.entries()).map(([location, profilesList]) => ({
+      location,
+      count: profilesList.length,
+      profiles: profilesList,
+    }));
+
+    hubs.sort((a, b) => b.count - a.count);
+
+    return hubs;
+  }
+
+  async getProfilesInLocation(location: string): Promise<(Profile & { user: User })[]> {
+    const results = await db.query.profiles.findMany({
+      where: and(
+        eq(profiles.isVisible, true),
+        sql`LOWER(${profiles.location}) = LOWER(${location})`
+      ),
+      with: { user: true },
+    });
+
+    return results as (Profile & { user: User })[];
   }
 
   // === Likes ===

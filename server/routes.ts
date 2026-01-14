@@ -115,6 +115,27 @@ export async function registerRoutes(
     }
   });
 
+  // === Location Hubs ===
+
+  app.get("/api/profiles/by-location", isAuthenticated, async (req, res) => {
+    try {
+      const hubs = await storage.getProfilesByLocation();
+      res.json(hubs);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/profiles/by-location/:location", isAuthenticated, async (req, res) => {
+    try {
+      const location = decodeURIComponent(req.params.location);
+      const profiles = await storage.getProfilesInLocation(location);
+      res.json(profiles);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // === Likes ===
 
   app.post(api.likes.create.path, isAuthenticated, async (req, res) => {
