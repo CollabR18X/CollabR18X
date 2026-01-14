@@ -48,8 +48,8 @@ export async function registerRoutes(
     const userId = (req.user as any).claims.sub;
     const myProfile = await storage.getProfileByUserId(userId);
     
-    if (!myProfile?.ageVerified) {
-      return res.status(403).json({ message: "Age verification required" });
+    if (!myProfile?.ageVerified || !myProfile?.socialsVerified) {
+      return res.status(403).json({ message: "Age and social verification required" });
     }
 
     const profiles = await storage.getAllProfiles();
@@ -61,8 +61,8 @@ export async function registerRoutes(
     const userId = (req.user as any).claims.sub;
     const myProfile = await storage.getProfileByUserId(userId);
     
-    if (!myProfile?.ageVerified) {
-      return res.status(403).json({ message: "Age verification required" });
+    if (!myProfile?.ageVerified || !myProfile?.socialsVerified) {
+      return res.status(403).json({ message: "Age and social verification required" });
     }
 
     const profile = await storage.getProfile(Number(req.params.id));
