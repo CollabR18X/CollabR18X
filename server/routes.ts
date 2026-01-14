@@ -34,7 +34,10 @@ export async function registerRoutes(
       res.json(profile);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
       }
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -79,7 +82,10 @@ export async function registerRoutes(
       res.status(201).json(collab);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
       }
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -92,18 +98,26 @@ export async function registerRoutes(
       const input = api.collaborations.updateStatus.input.parse(req.body);
       const collabId = Number(req.params.id);
 
-      // Verify ownership (only receiver can accept/reject?)
-      // For simplicity, we assume the frontend sends requests to the right endpoint
-      // Realistically we should check if req.user is the receiver.
-      
-      const updated = await storage.updateCollaborationStatus(collabId, input.status);
-      if (!updated) {
+      const collabs = await storage.getCollaborationsForUser(userId);
+      const collab = collabs.find(c => c.id === collabId);
+
+      if (!collab) {
         return res.status(404).json({ message: "Collaboration not found" });
       }
+
+      // Only the receiver can update the status (accept/reject)
+      if (collab.receiverId !== userId) {
+        return res.status(403).json({ message: "Only the receiver can update status" });
+      }
+      
+      const updated = await storage.updateCollaborationStatus(collabId, input.status);
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
       }
       res.status(500).json({ message: "Internal Server Error" });
     }
