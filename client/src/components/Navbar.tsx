@@ -5,7 +5,8 @@ import {
   LayoutDashboard, 
   SquareUser, 
   LogOut, 
-  UserCircle 
+  UserCircle,
+  ShieldOff
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -69,14 +70,21 @@ export function Navbar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <Link href="/profile/me">
-                <DropdownMenuItem className="cursor-pointer">
+                <DropdownMenuItem className="cursor-pointer" data-testid="menu-my-profile">
                   <UserCircle className="mr-2 h-4 w-4" />
                   My Profile
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/blocked">
+                <DropdownMenuItem className="cursor-pointer" data-testid="menu-blocked-users">
+                  <ShieldOff className="mr-2 h-4 w-4" />
+                  Blocked Users
                 </DropdownMenuItem>
               </Link>
               <DropdownMenuItem 
                 className="text-destructive focus:text-destructive cursor-pointer"
                 onClick={() => logout()}
+                data-testid="menu-logout"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout

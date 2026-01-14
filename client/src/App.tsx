@@ -12,6 +12,7 @@ import Directory from "@/pages/Directory";
 import MyProfile from "@/pages/MyProfile";
 import Profile from "@/pages/Profile";
 import Collaborations from "@/pages/Collaborations";
+import BlockedUsers from "@/pages/BlockedUsers";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -44,6 +45,7 @@ function Router() {
           <Route path="/profile/me" component={MyProfile} />
           <Route path="/profile/:id" component={Profile} />
           <Route path="/collaborations" component={Collaborations} />
+          <Route path="/blocked" component={BlockedUsers} />
           <Route component={NotFound} />
         </Switch>
       </main>

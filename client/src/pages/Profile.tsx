@@ -1,17 +1,39 @@
 import { useProfile } from "@/hooks/use-profiles";
 import { useAuth } from "@/hooks/use-auth";
+import { useBlockUser } from "@/hooks/use-blocks";
 import { CollabRequestModal } from "@/components/CollabRequestModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Link, useRoute } from "wouter";
-import { ArrowLeft, MapPin, Globe, Instagram, Twitter, Youtube, ExternalLink } from "lucide-react";
+import { Link, useRoute, useLocation } from "wouter";
+import { ArrowLeft, MapPin, Globe, Instagram, Twitter, Youtube, ExternalLink, ShieldBan, Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function Profile() {
   const [, params] = useRoute("/profile/:id");
   const id = parseInt(params?.id || "0");
   const { data: profile, isLoading, error } = useProfile(id);
   const { user } = useAuth();
+  const { mutate: blockUser, isPending: isBlocking } = useBlockUser();
+  const [, setLocation] = useLocation();
+
+  const handleBlock = () => {
+    if (profile?.userId) {
+      blockUser(profile.userId, {
+        onSuccess: () => setLocation("/blocked")
+      });
+    }
+  };
 
   if (isLoading) return <ProfileSkeleton />;
   if (error || !profile) return <div className="p-8 text-center">Profile not found</div>;
@@ -62,15 +84,47 @@ export default function Profile() {
               {/* Action Buttons */}
               <div className="mt-4 flex gap-3 w-full md:w-auto">
                 {!isOwnProfile ? (
-                  <CollabRequestModal 
-                    receiverId={profile.userId}
-                    receiverName={profile.user.firstName || "Creator"}
-                    trigger={
-                      <Button size="lg" className="w-full md:w-auto bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
-                        Let's Collaborate
-                      </Button>
-                    }
-                  />
+                  <>
+                    <CollabRequestModal 
+                      receiverId={profile.userId}
+                      receiverName={profile.user.firstName || "Creator"}
+                      trigger={
+                        <Button size="lg" className="w-full md:w-auto bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
+                          Let's Collaborate
+                        </Button>
+                      }
+                    />
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="lg"
+                          data-testid="button-block-user"
+                        >
+                          <ShieldBan className="h-4 w-4 mr-2" />
+                          Block
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Block {profile.user.firstName}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will prevent them from seeing your profile, messaging you, or sending collaboration requests. You can unblock them later from your settings.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={handleBlock}
+                            disabled={isBlocking}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {isBlocking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Block User'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
                 ) : (
                   <Link href="/profile/me">
                     <Button variant="outline">Edit Profile</Button>
