@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Sparkles, Users, Zap, ArrowRight } from "lucide-react";
+import { Sparkles, Users, Zap, ArrowRight, MessageSquare } from "lucide-react";
 
 export default function Landing() {
   const container = {
@@ -85,7 +85,7 @@ export default function Landing() {
                 desc: "Search creators by niche, audience size, and platform to find your perfect match."
               },
               {
-                icon: MessageSquareHand,
+                icon: MessageSquare,
                 title: "Manage Requests",
                 desc: "Keep track of all your collaboration offers in one organized dashboard."
               },
