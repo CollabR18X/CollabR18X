@@ -9,17 +9,36 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle, Camera, X, Plus } from "lucide-react";
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useUpload } from "@/hooks/use-upload";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export default function MyProfile() {
   const { user } = useAuth();
-  const { data: profile, isLoading } = useMyProfile();
+  const { data: profile, isLoading, refetch } = useMyProfile();
   const { mutate, isPending } = useUpdateProfile();
   const { toast } = useToast();
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const { uploadFile, isUploading } = useUpload({
+    onSuccess: (response) => {
+      const newPhotos = [...photos, response.objectPath];
+      setPhotos(newPhotos);
+      mutate({ photos: newPhotos }, {
+        onSuccess: () => {
+          refetch();
+          toast({ title: "Photo uploaded", description: "Your profile photo has been added." });
+        }
+      });
+    },
+    onError: (error) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    }
+  });
 
   const form = useForm<InsertProfile & { instagram?: string; twitter?: string; youtube?: string; tiktok?: string }>({
     resolver: zodResolver(insertProfileSchema.extend({})),
@@ -56,8 +75,36 @@ export default function MyProfile() {
         lookingFor: profile.lookingFor || "",
         isVisible: profile.isVisible ?? true,
       });
+      setPhotos(profile.photos || []);
     }
   }, [profile, form]);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({ title: "Invalid file", description: "Please select an image file.", variant: "destructive" });
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Please select an image under 5MB.", variant: "destructive" });
+        return;
+      }
+      await uploadFile(file);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removePhoto = (index: number) => {
+    const newPhotos = photos.filter((_, i) => i !== index);
+    setPhotos(newPhotos);
+    mutate({ photos: newPhotos }, {
+      onSuccess: () => {
+        refetch();
+        toast({ title: "Photo removed", description: "Your profile photo has been removed." });
+      }
+    });
+  };
 
   const saveProfile = useCallback((data: any, force = false) => {
     if (!profile && !force) return;
@@ -160,6 +207,64 @@ export default function MyProfile() {
           )}
         </div>
       </div>
+
+      <Card className="border-border/50 shadow-lg mb-6">
+        <CardHeader>
+          <CardTitle>Profile Photos</CardTitle>
+          <CardDescription>Add photos to your profile. The first photo will be your main profile picture.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            {photos.map((photo, index) => (
+              <div key={index} className="relative group">
+                <img
+                  src={photo}
+                  alt={`Profile photo ${index + 1}`}
+                  className="w-24 h-24 rounded-lg object-cover border"
+                  data-testid={`img-profile-photo-${index}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removePhoto(index)}
+                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  data-testid={`button-remove-photo-${index}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+                {index === 0 && (
+                  <span className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded">
+                    Main
+                  </span>
+                )}
+              </div>
+            ))}
+            {photos.length < 6 && (
+              <label
+                className="w-24 h-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
+                data-testid="button-add-photo"
+              >
+                {isUploading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                ) : (
+                  <>
+                    <Camera className="h-6 w-6 text-muted-foreground mb-1" />
+                    <span className="text-xs text-muted-foreground">Add Photo</span>
+                  </>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  disabled={isUploading}
+                />
+              </label>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">You can add up to 6 photos. Max 5MB each.</p>
+        </CardContent>
+      </Card>
 
       <Card className="border-border/50 shadow-lg mb-6">
         <CardHeader>
