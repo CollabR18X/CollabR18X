@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Directory from "@/pages/Directory";
+import Discovery from "@/pages/Discovery";
 import MyProfile from "@/pages/MyProfile";
 import Profile from "@/pages/Profile";
 import Collaborations from "@/pages/Collaborations";
@@ -50,6 +51,7 @@ function Router() {
       <main className="min-h-[calc(100vh-64px)] bg-background">
         <Switch>
           <Route path="/" component={Dashboard} />
+          <Route path="/discovery" component={Discovery} />
           <Route path="/directory" component={Directory} />
           <Route path="/nearby" component={Nearby} />
           <Route path="/similar-interests" component={SimilarInterests} />

@@ -2,7 +2,7 @@ import { db } from "./db";
 import {
   profiles, collaborations, users, likes, matches, messages, blocks, reports,
   forumTopics, forumPosts, postReplies, events, eventAttendees, safetyAlerts,
-  collaborationWorkspaces,
+  collaborationWorkspaces, collabTemplates, savedProfiles,
   type Profile, type InsertProfile,
   type Collaboration, type InsertCollaboration,
   type User,
@@ -17,20 +17,37 @@ import {
   type Event, type InsertEvent,
   type EventAttendee, type InsertEventAttendee,
   type SafetyAlert, type InsertSafetyAlert,
-  type CollaborationWorkspace, type InsertCollaborationWorkspace
+  type CollaborationWorkspace, type InsertCollaborationWorkspace,
+  type CollabTemplate, type InsertCollabTemplate,
+  type SavedProfile
 } from "@shared/schema";
 import { eq, or, and, desc, ne, notInArray, sql, gte, lte, asc, count } from "drizzle-orm";
+
+export interface DiscoverFilters {
+  maxDistance?: number;
+  contentType?: string;
+  experienceLevel?: string[];
+  availability?: string[];
+  travelMode?: string[];
+  monetization?: string[];
+}
 
 export interface IStorage {
   // Profiles
   getProfile(id: number): Promise<(Profile & { user: User }) | undefined>;
   getProfileByUserId(userId: string): Promise<Profile | undefined>;
   getAllProfiles(): Promise<(Profile & { user: User })[]>;
-  getDiscoverProfiles(userId: string): Promise<(Profile & { user: User; matchScore: number })[]>;
+  getDiscoverProfiles(userId: string, filters?: DiscoverFilters): Promise<(Profile & { user: User; matchScore: number })[]>;
   createProfile(userId: string, profile: InsertProfile): Promise<Profile>;
   updateProfile(userId: string, updates: Partial<InsertProfile>): Promise<Profile>;
   updateProfileLocation(userId: string, lat: number, lng: number): Promise<Profile>;
   getNearbyProfiles(lat: number, lng: number, maxDistance: number, userId: string): Promise<(Profile & { user: User; distance: number })[]>;
+
+  // Saved Profiles
+  saveProfile(userId: string, savedUserId: string): Promise<SavedProfile>;
+  unsaveProfile(userId: string, savedUserId: string): Promise<boolean>;
+  getSavedProfiles(userId: string): Promise<(SavedProfile & { savedUser: User })[]>;
+  isProfileSaved(userId: string, savedUserId: string): Promise<boolean>;
 
   // Likes
   createLike(likerId: string, likedId: string, isSuperLike?: boolean): Promise<Like>;
@@ -112,6 +129,10 @@ export interface IStorage {
   createWorkspace(collaborationId: number): Promise<CollaborationWorkspace>;
   updateWorkspace(collaborationId: number, userId: string, data: Partial<InsertCollaborationWorkspace>): Promise<CollaborationWorkspace | undefined>;
   acknowledgeWorkspaceBoundaries(collaborationId: number, userId: string): Promise<CollaborationWorkspace | undefined>;
+
+  // Collab Templates
+  getCollabTemplates(): Promise<CollabTemplate[]>;
+  seedCollabTemplates(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -137,7 +158,7 @@ export class DatabaseStorage implements IStorage {
     return results as (Profile & { user: User })[];
   }
 
-  async getDiscoverProfiles(userId: string): Promise<(Profile & { user: User; matchScore: number })[]> {
+  async getDiscoverProfiles(userId: string, filters?: DiscoverFilters): Promise<(Profile & { user: User; matchScore: number })[]> {
     const myProfile = await this.getProfileByUserId(userId);
     const blockedByMe = await db.select({ blockedId: blocks.blockedId }).from(blocks).where(eq(blocks.blockerId, userId));
     const blockedMe = await db.select({ blockerId: blocks.blockerId }).from(blocks).where(eq(blocks.blockedId, userId));
@@ -162,7 +183,57 @@ export class DatabaseStorage implements IStorage {
       with: { user: true },
     });
 
-    const scoredProfiles = results.map(profile => {
+    let filteredResults = results;
+
+    if (filters) {
+      filteredResults = results.filter(profile => {
+        if (filters.contentType && profile.niche) {
+          if (!profile.niche.toLowerCase().includes(filters.contentType.toLowerCase())) {
+            return false;
+          }
+        }
+
+        if (filters.experienceLevel && filters.experienceLevel.length > 0 && profile.experienceLevel) {
+          if (!filters.experienceLevel.includes(profile.experienceLevel)) {
+            return false;
+          }
+        }
+
+        if (filters.availability && filters.availability.length > 0 && profile.availability) {
+          if (!filters.availability.includes(profile.availability)) {
+            return false;
+          }
+        }
+
+        if (filters.travelMode && filters.travelMode.length > 0 && profile.travelMode) {
+          if (!filters.travelMode.includes(profile.travelMode)) {
+            return false;
+          }
+        }
+
+        if (filters.monetization && filters.monetization.length > 0 && profile.monetizationExpectation) {
+          if (!filters.monetization.includes(profile.monetizationExpectation)) {
+            return false;
+          }
+        }
+
+        if (filters.maxDistance && myProfile?.latitude && myProfile?.longitude && profile.latitude && profile.longitude) {
+          const distance = this.calculateHaversineDistance(
+            myProfile.latitude,
+            myProfile.longitude,
+            profile.latitude,
+            profile.longitude
+          );
+          if (distance > filters.maxDistance) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    const scoredProfiles = filteredResults.map(profile => {
       const score = this.calculateMatchScore(myProfile, profile);
       return { ...profile, matchScore: score };
     });
@@ -412,6 +483,39 @@ export class DatabaseStorage implements IStorage {
     });
 
     return results as (Profile & { user: User })[];
+  }
+
+  // === Saved Profiles ===
+  async saveProfile(userId: string, savedUserId: string): Promise<SavedProfile> {
+    const existing = await db.select().from(savedProfiles)
+      .where(and(eq(savedProfiles.userId, userId), eq(savedProfiles.savedUserId, savedUserId)));
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    const [saved] = await db.insert(savedProfiles).values({ userId, savedUserId }).returning();
+    return saved;
+  }
+
+  async unsaveProfile(userId: string, savedUserId: string): Promise<boolean> {
+    const [deleted] = await db.delete(savedProfiles)
+      .where(and(eq(savedProfiles.userId, userId), eq(savedProfiles.savedUserId, savedUserId)))
+      .returning();
+    return !!deleted;
+  }
+
+  async getSavedProfiles(userId: string): Promise<(SavedProfile & { savedUser: User })[]> {
+    const results = await db.query.savedProfiles.findMany({
+      where: eq(savedProfiles.userId, userId),
+      with: { savedUser: true },
+      orderBy: desc(savedProfiles.createdAt)
+    });
+    return results as (SavedProfile & { savedUser: User })[];
+  }
+
+  async isProfileSaved(userId: string, savedUserId: string): Promise<boolean> {
+    const [saved] = await db.select().from(savedProfiles)
+      .where(and(eq(savedProfiles.userId, userId), eq(savedProfiles.savedUserId, savedUserId)));
+    return !!saved;
   }
 
   // === Likes ===
@@ -1004,6 +1108,46 @@ export class DatabaseStorage implements IStorage {
       .where(eq(collaborationWorkspaces.collaborationId, collaborationId))
       .returning();
     return updated;
+  }
+
+  // === Collab Templates ===
+  async getCollabTemplates(): Promise<CollabTemplate[]> {
+    const results = await db.select().from(collabTemplates);
+    return results;
+  }
+
+  async seedCollabTemplates(): Promise<void> {
+    const existing = await db.select().from(collabTemplates).limit(1);
+    if (existing.length > 0) return;
+
+    const defaultTemplates: InsertCollabTemplate[] = [
+      {
+        name: "Photo Collab",
+        content: "Hey! I'd love to collaborate on a photo shoot. Are you available to discuss ideas?",
+        category: "collab",
+        isDefault: true,
+      },
+      {
+        name: "Video Collab",
+        content: "Hi there! I'm looking for a partner for a video project. Would you be interested in chatting about it?",
+        category: "collab",
+        isDefault: true,
+      },
+      {
+        name: "Brand Deal Share",
+        content: "Hello! I have a brand opportunity that might work well for both of us. Interested in hearing more?",
+        category: "business",
+        isDefault: true,
+      },
+      {
+        name: "Content Exchange",
+        content: "Hi! Would you be open to a content exchange or cross-promotion?",
+        category: "networking",
+        isDefault: true,
+      },
+    ];
+
+    await db.insert(collabTemplates).values(defaultTemplates);
   }
 }
 

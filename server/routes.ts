@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
@@ -6,6 +6,28 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { insertForumTopicSchema, insertForumPostSchema, insertPostReplySchema, insertEventSchema, insertSafetyAlertSchema } from "@shared/schema";
+
+// Rate limiting for messages - 30 messages per minute per user
+const messageRateLimits = new Map<string, { count: number; resetTime: number }>();
+const MESSAGE_RATE_LIMIT = 30;
+const MESSAGE_RATE_WINDOW = 60 * 1000; // 1 minute in ms
+
+function checkMessageRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const userLimit = messageRateLimits.get(userId);
+  
+  if (!userLimit || now > userLimit.resetTime) {
+    messageRateLimits.set(userId, { count: 1, resetTime: now + MESSAGE_RATE_WINDOW });
+    return true;
+  }
+  
+  if (userLimit.count >= MESSAGE_RATE_LIMIT) {
+    return false;
+  }
+  
+  userLimit.count++;
+  return true;
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -44,9 +66,35 @@ export async function registerRoutes(
   });
 
   app.get("/api/profiles/discover", isAuthenticated, async (req, res) => {
-    const userId = (req.user as any).claims.sub;
-    const profiles = await storage.getDiscoverProfiles(userId);
-    res.json(profiles);
+    try {
+      const userId = (req.user as any).claims.sub;
+      const filterSchema = z.object({
+        maxDistance: z.coerce.number().optional(),
+        contentType: z.string().optional(),
+        experienceLevel: z.string().transform(s => s ? s.split(',') : undefined).optional(),
+        availability: z.string().transform(s => s ? s.split(',') : undefined).optional(),
+        travelMode: z.string().transform(s => s ? s.split(',') : undefined).optional(),
+        monetization: z.string().transform(s => s ? s.split(',') : undefined).optional(),
+      });
+      const filters = filterSchema.parse(req.query);
+      const profiles = await storage.getDiscoverProfiles(userId, {
+        maxDistance: filters.maxDistance,
+        contentType: filters.contentType,
+        experienceLevel: filters.experienceLevel,
+        availability: filters.availability,
+        travelMode: filters.travelMode,
+        monetization: filters.monetization,
+      });
+      res.json(profiles);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   app.get(api.profiles.list.path, isAuthenticated, async (req, res) => {
@@ -131,6 +179,45 @@ export async function registerRoutes(
       const location = decodeURIComponent(req.params.location);
       const profiles = await storage.getProfilesInLocation(location);
       res.json(profiles);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === Saved Profiles ===
+
+  app.get("/api/profiles/saved", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const saved = await storage.getSavedProfiles(userId);
+      res.json(saved);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/profiles/:id/save", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const savedUserId = req.params.id;
+      
+      if (savedUserId === userId) {
+        return res.status(400).json({ message: "Cannot save your own profile" });
+      }
+
+      const saved = await storage.saveProfile(userId, savedUserId);
+      res.status(201).json(saved);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete("/api/profiles/:id/save", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const savedUserId = req.params.id;
+      const success = await storage.unsaveProfile(userId, savedUserId);
+      res.json({ success });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -232,8 +319,23 @@ export async function registerRoutes(
       const matchId = Number(req.params.matchId);
       const input = api.messages.send.input.parse(req.body);
       
-      const isInMatch = await storage.isUserInMatch(userId, matchId);
-      if (!isInMatch) {
+      // Rate limiting check - 30 messages per minute per user
+      if (!checkMessageRateLimit(userId)) {
+        return res.status(429).json({ message: "Too Many Requests. Please slow down." });
+      }
+      
+      // Verify user is part of this match and match is active (prevents cold DMs)
+      const match = await storage.getMatch(matchId);
+      if (!match) {
+        return res.status(404).json({ message: "Match not found" });
+      }
+      
+      if (!match.isActive) {
+        return res.status(403).json({ message: "This match is no longer active" });
+      }
+      
+      // Explicit check that the user is one of the two parties in the match
+      if (match.user1Id !== userId && match.user2Id !== userId) {
         return res.status(403).json({ message: "Not authorized to send messages in this match" });
       }
 
@@ -823,8 +925,20 @@ export async function registerRoutes(
     }
   });
 
-  // Seed forum topics on startup
+  // === Collab Templates ===
+
+  app.get("/api/templates", async (req, res) => {
+    try {
+      const templates = await storage.getCollabTemplates();
+      res.json(templates);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Seed data on startup
   await storage.seedForumTopics();
+  await storage.seedCollabTemplates();
 
   return httpServer;
 }

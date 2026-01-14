@@ -2,12 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { useScreenshotDetection } from "@/hooks/use-screenshot-detection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card } from "@/components/ui/card";
-import { Loader2, Send, MessageCircle, Phone, Video, ArrowLeft, MoreVertical } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Loader2, Send, MessageCircle, Phone, Video, ArrowLeft, MoreVertical, Lock, Paperclip, Mic, FileText, Image, VideoIcon, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Link, useRoute, useLocation } from "wouter";
@@ -34,16 +37,38 @@ interface Message {
   content: string;
   isRead: boolean;
   createdAt: string;
+  messageType?: "text" | "image" | "video" | "voice" | "template";
+}
+
+interface CollabTemplate {
+  id: number;
+  name: string;
+  content: string;
+  category: string;
 }
 
 export default function Chat() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [attachmentOpen, setAttachmentOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [, params] = useRoute("/chat/:matchId");
   const [, setLocation] = useLocation();
+
+  useScreenshotDetection({
+    onScreenshotDetected: () => {
+      toast({
+        title: "Screenshot Detected",
+        description: "Please respect privacy - screenshots may violate trust.",
+        variant: "destructive",
+      });
+    },
+    enabled: !!selectedMatchId,
+  });
 
   useEffect(() => {
     if (params?.matchId) {
@@ -71,6 +96,15 @@ export default function Chat() {
     },
     enabled: !!selectedMatchId,
     refetchInterval: 3000,
+  });
+
+  const { data: templates } = useQuery<CollabTemplate[]>({
+    queryKey: ["/api/templates"],
+    queryFn: async () => {
+      const res = await fetch("/api/templates", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch templates");
+      return res.json();
+    },
   });
 
   const sendMessage = useMutation({
@@ -109,6 +143,41 @@ export default function Chat() {
   const selectMatch = (matchId: number) => {
     setSelectedMatchId(matchId);
     setLocation(`/chat/${matchId}`);
+  };
+
+  const handleTemplateSelect = (template: CollabTemplate) => {
+    setMessageInput(template.content);
+    setTemplatesOpen(false);
+  };
+
+  const handleAttachment = (type: "photo" | "video") => {
+    setAttachmentOpen(false);
+    toast({
+      title: "Coming Soon",
+      description: `${type === "photo" ? "Photo" : "Video"} sharing will be available soon.`,
+    });
+  };
+
+  const handleVoiceNote = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Voice notes will be available soon.",
+    });
+  };
+
+  const getMessageTypeIcon = (type?: string) => {
+    switch (type) {
+      case "image":
+        return <Image className="h-3 w-3" />;
+      case "video":
+        return <VideoIcon className="h-3 w-3" />;
+      case "voice":
+        return <Mic className="h-3 w-3" />;
+      case "template":
+        return <FileText className="h-3 w-3" />;
+      default:
+        return null;
+    }
   };
 
   if (matchesLoading) {
@@ -191,51 +260,60 @@ export default function Chat() {
         ) : (
           <>
             {currentMatch && (
-              <div className="p-4 border-b flex items-center gap-3 bg-card">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden"
-                  onClick={() => {
-                    setSelectedMatchId(null);
-                    setLocation("/chat");
-                  }}
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={getOtherUser(currentMatch)?.profileImageUrl || undefined} />
-                  <AvatarFallback>{getOtherUser(currentMatch)?.firstName?.[0]}</AvatarFallback>
-                </Avatar>
-                
-                <div className="flex-1">
-                  <p className="font-medium">
-                    {getOtherUser(currentMatch)?.firstName} {getOtherUser(currentMatch)?.lastName}
-                  </p>
-                </div>
+              <div className="p-4 border-b flex flex-col gap-2 bg-card">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden"
+                    onClick={() => {
+                      setSelectedMatchId(null);
+                      setLocation("/chat");
+                    }}
+                    data-testid="button-back"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={getOtherUser(currentMatch)?.profileImageUrl || undefined} />
+                    <AvatarFallback>{getOtherUser(currentMatch)?.firstName?.[0]}</AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1">
+                    <p className="font-medium">
+                      {getOtherUser(currentMatch)?.firstName} {getOtherUser(currentMatch)?.lastName}
+                    </p>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" data-testid="button-voice-call" title="Voice call (coming soon)" disabled>
-                    <Phone className="h-5 w-5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" data-testid="button-video-call" title="Video call (coming soon)" disabled>
-                    <Video className="h-5 w-5" />
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <Link href={`/profile/${matches?.find(m => m.id === selectedMatchId)?.user1Id === user?.id 
-                        ? matches?.find(m => m.id === selectedMatchId)?.user2.id 
-                        : matches?.find(m => m.id === selectedMatchId)?.user1.id}`}>
-                        <DropdownMenuItem>View Profile</DropdownMenuItem>
-                      </Link>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" data-testid="button-voice-call" title="Voice call (coming soon)" disabled>
+                      <Phone className="h-5 w-5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" data-testid="button-video-call" title="Video call (coming soon)" disabled>
+                      <Video className="h-5 w-5" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" data-testid="button-more-options">
+                          <MoreVertical className="h-5 w-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <Link href={`/profile/${matches?.find(m => m.id === selectedMatchId)?.user1Id === user?.id 
+                          ? matches?.find(m => m.id === selectedMatchId)?.user2.id 
+                          : matches?.find(m => m.id === selectedMatchId)?.user1.id}`}>
+                          <DropdownMenuItem data-testid="menu-item-view-profile">View Profile</DropdownMenuItem>
+                        </Link>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Lock className="h-3 w-3" />
+                  <span>Messages are encrypted</span>
+                  <ShieldCheck className="h-3 w-3 ml-2 text-green-500" />
                 </div>
               </div>
             )}
@@ -254,6 +332,11 @@ export default function Chat() {
                   )}
                   {currentMatch?.messages?.map((message: Message) => {
                     const isMe = message.senderId === user?.id;
+                    const messageType = message.messageType || "text";
+                    const isTemplate = messageType === "template";
+                    const isMedia = messageType === "image" || messageType === "video";
+                    const isVoice = messageType === "voice";
+                    
                     return (
                       <div
                         key={message.id}
@@ -264,17 +347,50 @@ export default function Chat() {
                             "max-w-[70%] rounded-2xl px-4 py-2",
                             isMe
                               ? "bg-primary text-primary-foreground"
-                              : "bg-muted"
+                              : "bg-muted",
+                            isTemplate && "border-2 border-dashed border-primary/30"
                           )}
                           data-testid={`message-${message.id}`}
                         >
+                          {isTemplate && (
+                            <div className="flex items-center gap-1 mb-1">
+                              <Badge variant="secondary" className="text-xs">
+                                <FileText className="h-2 w-2 mr-1" />
+                                Template
+                              </Badge>
+                            </div>
+                          )}
+                          
+                          {isMedia && (
+                            <div className="flex items-center gap-2 mb-2 p-3 rounded-lg bg-background/20">
+                              {getMessageTypeIcon(messageType)}
+                              <span className="text-sm opacity-80">
+                                {messageType === "image" ? "Photo" : "Video"} attachment
+                              </span>
+                            </div>
+                          )}
+                          
+                          {isVoice && (
+                            <div className="flex items-center gap-2 mb-2 p-3 rounded-lg bg-background/20">
+                              <Mic className="h-4 w-4" />
+                              <div className="flex-1 h-1 bg-current/20 rounded-full overflow-hidden">
+                                <div className="h-full w-1/2 bg-current rounded-full" />
+                              </div>
+                              <span className="text-xs">0:30</span>
+                            </div>
+                          )}
+                          
                           <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                          <p className={cn(
-                            "text-xs mt-1",
+                          
+                          <div className={cn(
+                            "flex items-center gap-1 mt-1",
                             isMe ? "text-primary-foreground/70" : "text-muted-foreground"
                           )}>
-                            {format(new Date(message.createdAt), "h:mm a")}
-                          </p>
+                            <Lock className="h-2 w-2" />
+                            <span className="text-xs">
+                              {format(new Date(message.createdAt), "h:mm a")}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -285,7 +401,89 @@ export default function Chat() {
             </ScrollArea>
 
             <form onSubmit={handleSendMessage} className="p-4 border-t bg-card">
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <Popover open={attachmentOpen} onOpenChange={setAttachmentOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      data-testid="button-attachment"
+                    >
+                      <Paperclip className="h-5 w-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-40 p-2" align="start">
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => handleAttachment("photo")}
+                        data-testid="button-attach-photo"
+                      >
+                        <Image className="h-4 w-4 mr-2" />
+                        Photo
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => handleAttachment("video")}
+                        data-testid="button-attach-video"
+                      >
+                        <VideoIcon className="h-4 w-4 mr-2" />
+                        Video
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                <Popover open={templatesOpen} onOpenChange={setTemplatesOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      data-testid="button-templates"
+                    >
+                      <FileText className="h-5 w-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-2" align="start">
+                    <div className="mb-2 px-2">
+                      <p className="font-medium text-sm">Collab Templates</p>
+                      <p className="text-xs text-muted-foreground">Quick messages for collabs</p>
+                    </div>
+                    <ScrollArea className="max-h-60">
+                      <div className="flex flex-col gap-1">
+                        {templates?.map((template) => (
+                          <Button
+                            key={template.id}
+                            variant="ghost"
+                            size="sm"
+                            className="justify-start h-auto py-2 px-2"
+                            onClick={() => handleTemplateSelect(template)}
+                            data-testid={`template-${template.id}`}
+                          >
+                            <div className="text-left">
+                              <p className="font-medium text-sm">{template.name}</p>
+                              <p className="text-xs text-muted-foreground line-clamp-1">
+                                {template.content}
+                              </p>
+                            </div>
+                          </Button>
+                        ))}
+                        {(!templates || templates.length === 0) && (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No templates available
+                          </p>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
+
                 <Input
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
@@ -294,6 +492,17 @@ export default function Chat() {
                   data-testid="input-message"
                   disabled={sendMessage.isPending}
                 />
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleVoiceNote}
+                  data-testid="button-voice-note"
+                >
+                  <Mic className="h-5 w-5" />
+                </Button>
+
                 <Button
                   type="submit"
                   disabled={!messageInput.trim() || sendMessage.isPending}

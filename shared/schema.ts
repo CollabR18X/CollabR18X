@@ -53,6 +53,17 @@ export const profiles = pgTable("profiles", {
     safetyRequirements?: string[];
   }>().default({}),
   consentAcknowledgedAt: timestamp("consent_acknowledged_at"),
+  experienceLevel: text("experience_level"),
+  availability: text("availability"),
+  travelMode: text("travel_mode"),
+  monetizationExpectation: text("monetization_expectation"),
+});
+
+export const savedProfiles = pgTable("saved_profiles", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  savedUserId: text("saved_user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const likes = pgTable("likes", {
@@ -76,8 +87,21 @@ export const messages = pgTable("messages", {
   matchId: integer("match_id").notNull().references(() => matches.id),
   senderId: text("sender_id").notNull().references(() => users.id),
   content: text("content").notNull(),
+  messageType: text("message_type").notNull().default("text"),
+  mediaUrl: text("media_url"),
+  mediaThumbnail: text("media_thumbnail"),
+  isEncrypted: boolean("is_encrypted").notNull().default(true),
+  encryptedAt: timestamp("encrypted_at"),
   isRead: boolean("is_read").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const collabTemplates = pgTable("collab_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  content: text("content").notNull(),
+  category: text("category").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
 });
 
 export const blocks = pgTable("blocks", {
@@ -221,6 +245,21 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   createdEvents: many(events, { relationName: "eventCreator" }),
   eventAttendances: many(eventAttendees, { relationName: "eventAttendee" }),
   safetyAlerts: many(safetyAlerts, { relationName: "safetyAlertReporter" }),
+  savedProfiles: many(savedProfiles, { relationName: "savedBy" }),
+  savedByProfiles: many(savedProfiles, { relationName: "savedUser" }),
+}));
+
+export const savedProfilesRelations = relations(savedProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [savedProfiles.userId],
+    references: [users.id],
+    relationName: "savedBy",
+  }),
+  savedUser: one(users, {
+    fields: [savedProfiles.savedUserId],
+    references: [users.id],
+    relationName: "savedUser",
+  }),
 }));
 
 export const likesRelations = relations(likes, ({ one }) => ({
@@ -383,6 +422,8 @@ export const insertEventSchema = createInsertSchema(events).omit({ id: true, cre
 export const insertEventAttendeeSchema = createInsertSchema(eventAttendees).omit({ id: true, createdAt: true });
 export const insertSafetyAlertSchema = createInsertSchema(safetyAlerts).omit({ id: true, createdAt: true, isVerified: true, isResolved: true });
 export const insertCollaborationWorkspaceSchema = createInsertSchema(collaborationWorkspaces).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCollabTemplateSchema = createInsertSchema(collabTemplates).omit({ id: true });
+export const insertSavedProfileSchema = createInsertSchema(savedProfiles).omit({ id: true, createdAt: true });
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -412,3 +453,7 @@ export type SafetyAlert = typeof safetyAlerts.$inferSelect;
 export type InsertSafetyAlert = z.infer<typeof insertSafetyAlertSchema>;
 export type CollaborationWorkspace = typeof collaborationWorkspaces.$inferSelect;
 export type InsertCollaborationWorkspace = z.infer<typeof insertCollaborationWorkspaceSchema>;
+export type CollabTemplate = typeof collabTemplates.$inferSelect;
+export type InsertCollabTemplate = z.infer<typeof insertCollabTemplateSchema>;
+export type SavedProfile = typeof savedProfiles.$inferSelect;
+export type InsertSavedProfile = z.infer<typeof insertSavedProfileSchema>;

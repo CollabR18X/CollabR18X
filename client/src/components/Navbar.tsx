@@ -15,7 +15,8 @@ import {
   Calendar,
   Building,
   Shield,
-  ChevronDown
+  ChevronDown,
+  Sparkles
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -32,6 +33,7 @@ export function Navbar() {
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/discovery", label: "Discover", icon: Sparkles },
     { href: "/directory", label: "Directory", icon: Users },
     { href: "/nearby", label: "Nearby", icon: MapPin },
     { href: "/similar-interests", label: "Similar Interests", icon: Heart },
