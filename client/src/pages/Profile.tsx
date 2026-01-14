@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Globe, Instagram, Twitter, Youtube, ExternalLink, ShieldBan, Loader2 } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Instagram, Twitter, Youtube, ExternalLink, ShieldBan, Loader2, Briefcase, GraduationCap, Ruler, Calendar } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +40,25 @@ export default function Profile() {
 
   const isOwnProfile = user?.id === profile.userId;
   const socials = profile.socialLinks as any || {};
+  const privacy = profile.privacySettings as any || {};
+  
+  const calculateAge = (birthDate: string) => {
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+  
+  const showLocation = isOwnProfile || privacy.showLocation !== false;
+  const showAge = isOwnProfile || privacy.showAge !== false;
+  const showBirthDate = isOwnProfile || privacy.showBirthDate === true;
+  const showOccupation = isOwnProfile || privacy.showOccupation !== false;
+  const showEducation = isOwnProfile || privacy.showEducation !== false;
+  const showHeight = isOwnProfile || privacy.showHeight !== false;
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -148,10 +167,40 @@ export default function Profile() {
                 <div className="bg-muted/30 p-6 rounded-2xl border border-border/50">
                   <h3 className="font-semibold mb-4">Details</h3>
                   <div className="space-y-4 text-sm">
-                    {profile.location && (
+                    {profile.location && showLocation && (
                       <div className="flex items-center gap-3 text-muted-foreground">
                         <MapPin className="w-4 h-4 text-primary" />
                         <span>{profile.location}</span>
+                      </div>
+                    )}
+                    {profile.birthDate && showAge && (
+                      <div className="flex items-center gap-3 text-muted-foreground">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        <span>{calculateAge(profile.birthDate)} years old</span>
+                      </div>
+                    )}
+                    {profile.birthDate && showBirthDate && (
+                      <div className="flex items-center gap-3 text-muted-foreground">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        <span>Born {new Date(profile.birthDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {profile.occupation && showOccupation && (
+                      <div className="flex items-center gap-3 text-muted-foreground">
+                        <Briefcase className="w-4 h-4 text-primary" />
+                        <span>{profile.occupation}</span>
+                      </div>
+                    )}
+                    {profile.education && showEducation && (
+                      <div className="flex items-center gap-3 text-muted-foreground">
+                        <GraduationCap className="w-4 h-4 text-primary" />
+                        <span>{profile.education}</span>
+                      </div>
+                    )}
+                    {profile.height && showHeight && (
+                      <div className="flex items-center gap-3 text-muted-foreground">
+                        <Ruler className="w-4 h-4 text-primary" />
+                        <span>{profile.height} cm</span>
                       </div>
                     )}
                     {profile.portfolioUrl && (

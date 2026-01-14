@@ -30,6 +30,14 @@ export const profiles = pgTable("profiles", {
   photos: text("photos").array().notNull().default(sql`'{}'::text[]`),
   isVisible: boolean("is_visible").notNull().default(true),
   lastActive: timestamp("last_active").defaultNow(),
+  privacySettings: jsonb("privacy_settings").$type<{
+    showAge?: boolean;
+    showLocation?: boolean;
+    showBirthDate?: boolean;
+    showOccupation?: boolean;
+    showEducation?: boolean;
+    showHeight?: boolean;
+  }>().default({}),
   minAgePreference: integer("min_age_preference").default(18),
   maxAgePreference: integer("max_age_preference").default(99),
   maxDistance: integer("max_distance").default(100),

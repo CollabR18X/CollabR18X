@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle, Camera, X, Plus } from "lucide-react";
+import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle, Camera, X, Plus, Eye, EyeOff } from "lucide-react";
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
@@ -53,6 +53,14 @@ export default function MyProfile() {
       gender: "",
       lookingFor: "",
       isVisible: true,
+      privacySettings: {
+        showAge: true,
+        showLocation: true,
+        showBirthDate: false,
+        showOccupation: true,
+        showEducation: true,
+        showHeight: true,
+      },
     },
   });
 
@@ -74,6 +82,14 @@ export default function MyProfile() {
         gender: profile.gender || "",
         lookingFor: profile.lookingFor || "",
         isVisible: profile.isVisible ?? true,
+        privacySettings: profile.privacySettings || {
+          showAge: true,
+          showLocation: true,
+          showBirthDate: false,
+          showOccupation: true,
+          showEducation: true,
+          showHeight: true,
+        },
       });
       setPhotos(profile.photos || []);
     }
@@ -439,6 +455,118 @@ export default function MyProfile() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <EyeOff className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="font-semibold">Privacy Settings</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">Choose what personal information is visible to other users.</p>
+                
+                <div className="grid gap-3">
+                  <FormField
+                    control={form.control}
+                    name="privacySettings.showAge"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <FormLabel className="font-normal">Show my age</FormLabel>
+                        <FormControl>
+                          <Switch
+                            data-testid="switch-show-age"
+                            checked={field.value ?? true}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="privacySettings.showLocation"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <FormLabel className="font-normal">Show my location</FormLabel>
+                        <FormControl>
+                          <Switch
+                            data-testid="switch-show-location"
+                            checked={field.value ?? true}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="privacySettings.showBirthDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <FormLabel className="font-normal">Show my birth date</FormLabel>
+                        <FormControl>
+                          <Switch
+                            data-testid="switch-show-birthdate"
+                            checked={field.value ?? false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="privacySettings.showOccupation"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <FormLabel className="font-normal">Show my occupation</FormLabel>
+                        <FormControl>
+                          <Switch
+                            data-testid="switch-show-occupation"
+                            checked={field.value ?? true}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="privacySettings.showEducation"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <FormLabel className="font-normal">Show my education</FormLabel>
+                        <FormControl>
+                          <Switch
+                            data-testid="switch-show-education"
+                            checked={field.value ?? true}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="privacySettings.showHeight"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <FormLabel className="font-normal">Show my height</FormLabel>
+                        <FormControl>
+                          <Switch
+                            data-testid="switch-show-height"
+                            checked={field.value ?? true}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end pt-4">
