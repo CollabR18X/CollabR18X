@@ -175,6 +175,31 @@ export const safetyAlerts = pgTable("safety_alerts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const collaborationWorkspaces = pgTable("collaboration_workspaces", {
+  id: serial("id").primaryKey(),
+  collaborationId: integer("collaboration_id").notNull().references(() => collaborations.id).unique(),
+  concept: text("concept"),
+  shootDates: jsonb("shoot_dates").$type<{ date: string; time?: string; description?: string }[]>().default([]),
+  location: text("location"),
+  locationDetails: text("location_details"),
+  roles: jsonb("roles").$type<{ userId: string; role: string; responsibilities: string[] }[]>().default([]),
+  revenueSplit: jsonb("revenue_split").$type<{
+    type: 'equal' | 'percentage' | 'fixed';
+    splits: { userId: string; percentage?: number; fixedAmount?: number }[];
+  }>(),
+  boundariesAcknowledged: jsonb("boundaries_acknowledged").$type<{
+    user1Acknowledged: boolean;
+    user2Acknowledged: boolean;
+    acknowledgedAt?: { user1?: string; user2?: string };
+  }>().default({ user1Acknowledged: false, user2Acknowledged: false }),
+  testingDiscussionConfirmed: boolean("testing_discussion_confirmed").notNull().default(false),
+  testingDiscussionNotes: text("testing_discussion_notes"),
+  notes: text("notes"),
+  attachments: text("attachments").array().notNull().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const profilesRelations = relations(profiles, ({ one }) => ({
   user: one(users, {
     fields: [profiles.userId],
@@ -273,6 +298,17 @@ export const collaborationsRelations = relations(collaborations, ({ one }) => ({
     references: [users.id],
     relationName: "receiver",
   }),
+  workspace: one(collaborationWorkspaces, {
+    fields: [collaborations.id],
+    references: [collaborationWorkspaces.collaborationId],
+  }),
+}));
+
+export const collaborationWorkspacesRelations = relations(collaborationWorkspaces, ({ one }) => ({
+  collaboration: one(collaborations, {
+    fields: [collaborationWorkspaces.collaborationId],
+    references: [collaborations.id],
+  }),
 }));
 
 export const forumTopicsRelations = relations(forumTopics, ({ many }) => ({
@@ -346,6 +382,7 @@ export const insertPostReplySchema = createInsertSchema(postReplies).omit({ id: 
 export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
 export const insertEventAttendeeSchema = createInsertSchema(eventAttendees).omit({ id: true, createdAt: true });
 export const insertSafetyAlertSchema = createInsertSchema(safetyAlerts).omit({ id: true, createdAt: true, isVerified: true, isResolved: true });
+export const insertCollaborationWorkspaceSchema = createInsertSchema(collaborationWorkspaces).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -373,3 +410,5 @@ export type EventAttendee = typeof eventAttendees.$inferSelect;
 export type InsertEventAttendee = z.infer<typeof insertEventAttendeeSchema>;
 export type SafetyAlert = typeof safetyAlerts.$inferSelect;
 export type InsertSafetyAlert = z.infer<typeof insertSafetyAlertSchema>;
+export type CollaborationWorkspace = typeof collaborationWorkspaces.$inferSelect;
+export type InsertCollaborationWorkspace = z.infer<typeof insertCollaborationWorkspaceSchema>;

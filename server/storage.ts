@@ -2,6 +2,7 @@ import { db } from "./db";
 import {
   profiles, collaborations, users, likes, matches, messages, blocks, reports,
   forumTopics, forumPosts, postReplies, events, eventAttendees, safetyAlerts,
+  collaborationWorkspaces,
   type Profile, type InsertProfile,
   type Collaboration, type InsertCollaboration,
   type User,
@@ -15,7 +16,8 @@ import {
   type PostReply, type InsertPostReply,
   type Event, type InsertEvent,
   type EventAttendee, type InsertEventAttendee,
-  type SafetyAlert, type InsertSafetyAlert
+  type SafetyAlert, type InsertSafetyAlert,
+  type CollaborationWorkspace, type InsertCollaborationWorkspace
 } from "@shared/schema";
 import { eq, or, and, desc, ne, notInArray, sql, gte, lte, asc, count } from "drizzle-orm";
 
@@ -104,6 +106,12 @@ export interface IStorage {
 
   // Seed Data
   seedForumTopics(): Promise<void>;
+
+  // Collaboration Workspaces
+  getWorkspace(collaborationId: number): Promise<CollaborationWorkspace | undefined>;
+  createWorkspace(collaborationId: number): Promise<CollaborationWorkspace>;
+  updateWorkspace(collaborationId: number, userId: string, data: Partial<InsertCollaborationWorkspace>): Promise<CollaborationWorkspace | undefined>;
+  acknowledgeWorkspaceBoundaries(collaborationId: number, userId: string): Promise<CollaborationWorkspace | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -924,6 +932,78 @@ export class DatabaseStorage implements IStorage {
     ];
 
     await db.insert(forumTopics).values(defaultTopics);
+  }
+
+  // === Collaboration Workspaces ===
+  async getWorkspace(collaborationId: number): Promise<CollaborationWorkspace | undefined> {
+    const [workspace] = await db.select().from(collaborationWorkspaces).where(eq(collaborationWorkspaces.collaborationId, collaborationId));
+    return workspace;
+  }
+
+  async createWorkspace(collaborationId: number): Promise<CollaborationWorkspace> {
+    const existing = await this.getWorkspace(collaborationId);
+    if (existing) return existing;
+
+    const [workspace] = await db.insert(collaborationWorkspaces).values({
+      collaborationId,
+      boundariesAcknowledged: { user1Acknowledged: false, user2Acknowledged: false }
+    }).returning();
+    return workspace;
+  }
+
+  async updateWorkspace(collaborationId: number, userId: string, data: Partial<InsertCollaborationWorkspace>): Promise<CollaborationWorkspace | undefined> {
+    const [collab] = await db.select().from(collaborations).where(eq(collaborations.id, collaborationId));
+    if (!collab) return undefined;
+
+    if (collab.requesterId !== userId && collab.receiverId !== userId) {
+      return undefined;
+    }
+
+    let workspace = await this.getWorkspace(collaborationId);
+    if (!workspace) {
+      workspace = await this.createWorkspace(collaborationId);
+    }
+
+    const { collaborationId: _collabId, ...updateData } = data;
+    const [updated] = await db.update(collaborationWorkspaces)
+      .set({ ...updateData, updatedAt: new Date() } as Partial<typeof collaborationWorkspaces.$inferInsert>)
+      .where(eq(collaborationWorkspaces.collaborationId, collaborationId))
+      .returning();
+    return updated;
+  }
+
+  async acknowledgeWorkspaceBoundaries(collaborationId: number, userId: string): Promise<CollaborationWorkspace | undefined> {
+    const [collab] = await db.select().from(collaborations).where(eq(collaborations.id, collaborationId));
+    if (!collab) return undefined;
+
+    if (collab.requesterId !== userId && collab.receiverId !== userId) {
+      return undefined;
+    }
+
+    let workspace = await this.getWorkspace(collaborationId);
+    if (!workspace) {
+      workspace = await this.createWorkspace(collaborationId);
+    }
+
+    const currentAck = workspace.boundariesAcknowledged || { user1Acknowledged: false, user2Acknowledged: false };
+    const currentAckedAt = currentAck.acknowledgedAt || {};
+    const now = new Date().toISOString();
+
+    const isUser1 = collab.requesterId === userId;
+    const newAck = {
+      user1Acknowledged: isUser1 ? true : currentAck.user1Acknowledged,
+      user2Acknowledged: isUser1 ? currentAck.user2Acknowledged : true,
+      acknowledgedAt: {
+        ...currentAckedAt,
+        [isUser1 ? 'user1' : 'user2']: now
+      }
+    };
+
+    const [updated] = await db.update(collaborationWorkspaces)
+      .set({ boundariesAcknowledged: newAck, updatedAt: new Date() })
+      .where(eq(collaborationWorkspaces.collaborationId, collaborationId))
+      .returning();
+    return updated;
   }
 }
 

@@ -110,3 +110,77 @@ export function useAcknowledgeCollaboration() {
     },
   });
 }
+
+export function useWorkspace(collaborationId: number) {
+  return useQuery({
+    queryKey: ['/api/collaborations', collaborationId, 'workspace'],
+    queryFn: async () => {
+      const res = await fetch(`/api/collaborations/${collaborationId}/workspace`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch workspace");
+      return res.json();
+    },
+    enabled: collaborationId > 0,
+  });
+}
+
+export function useUpdateWorkspace() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ collaborationId, data }: { collaborationId: number; data: any }) => {
+      const res = await fetch(`/api/collaborations/${collaborationId}/workspace`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update workspace");
+      }
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/collaborations', variables.collaborationId, 'workspace'] });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useAcknowledgeWorkspaceBoundaries() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (collaborationId: number) => {
+      const res = await fetch(`/api/collaborations/${collaborationId}/workspace/acknowledge-boundaries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to acknowledge boundaries");
+      }
+      return res.json();
+    },
+    onSuccess: (_, collaborationId) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/collaborations', collaborationId, 'workspace'] });
+      toast({ 
+        title: "Boundaries Acknowledged", 
+        description: "You have acknowledged the collaboration boundaries." 
+      });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useCollaboration(id: number) {
+  const { data: collabs } = useCollaborations();
+  return collabs?.find(c => c.id === id);
+}

@@ -21,6 +21,7 @@ import Events from "@/pages/Events";
 import SafetyAlerts from "@/pages/SafetyAlerts";
 import LocalHubs from "@/pages/LocalHubs";
 import Community from "@/pages/Community";
+import CollaborationWorkspace from "@/pages/CollaborationWorkspace";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -55,6 +56,7 @@ function Router() {
           <Route path="/profile/me" component={MyProfile} />
           <Route path="/profile/:id" component={Profile} />
           <Route path="/collaborations" component={Collaborations} />
+          <Route path="/collaborations/:id/workspace" component={CollaborationWorkspace} />
           <Route path="/chat" component={Chat} />
           <Route path="/chat/:matchId" component={Chat} />
           <Route path="/blocked" component={BlockedUsers} />

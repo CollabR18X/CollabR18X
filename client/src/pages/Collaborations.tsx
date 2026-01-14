@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Check, X, Clock, MessageSquare, User, Calendar, Shield, CheckCircle, AlertTriangle, Lock } from "lucide-react";
+import { Check, X, Clock, MessageSquare, User, Calendar, Shield, CheckCircle, AlertTriangle, Lock, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
+import { Link } from "wouter";
 import {
   Dialog,
   DialogContent,
@@ -323,9 +324,16 @@ function RequestCard({ collab, type, onAccept, onReject, isProcessing, needsAckn
                 </Button>
               )}
               {isFullyAcknowledged && (
-                <Button variant="outline" size="sm">
-                  <MessageSquare className="w-4 h-4 mr-2" /> Open Chat
-                </Button>
+                <>
+                  <Link href={`/collaborations/${collab.id}/workspace`}>
+                    <Button size="sm" data-testid={`button-open-workspace-${collab.id}`}>
+                      <Briefcase className="w-4 h-4 mr-2" /> Open Workspace
+                    </Button>
+                  </Link>
+                  <Button variant="outline" size="sm">
+                    <MessageSquare className="w-4 h-4 mr-2" /> Open Chat
+                  </Button>
+                </>
               )}
             </div>
           </div>

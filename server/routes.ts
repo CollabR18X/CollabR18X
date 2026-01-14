@@ -428,6 +428,83 @@ export async function registerRoutes(
     }
   });
 
+  // === Collaboration Workspaces ===
+
+  app.get("/api/collaborations/:id/workspace", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const collabId = Number(req.params.id);
+
+      const collabs = await storage.getCollaborationsForUser(userId);
+      const collab = collabs.find(c => c.id === collabId);
+
+      if (!collab) {
+        return res.status(404).json({ message: "Collaboration not found" });
+      }
+
+      let workspace = await storage.getWorkspace(collabId);
+      if (!workspace) {
+        workspace = await storage.createWorkspace(collabId);
+      }
+
+      res.json(workspace);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.put("/api/collaborations/:id/workspace", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const collabId = Number(req.params.id);
+
+      const collabs = await storage.getCollaborationsForUser(userId);
+      const collab = collabs.find(c => c.id === collabId);
+
+      if (!collab) {
+        return res.status(404).json({ message: "Collaboration not found" });
+      }
+
+      const updated = await storage.updateWorkspace(collabId, userId, req.body);
+      if (!updated) {
+        return res.status(403).json({ message: "Not authorized to update this workspace" });
+      }
+
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.')
+        });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/collaborations/:id/workspace/acknowledge-boundaries", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).claims.sub;
+      const collabId = Number(req.params.id);
+
+      const collabs = await storage.getCollaborationsForUser(userId);
+      const collab = collabs.find(c => c.id === collabId);
+
+      if (!collab) {
+        return res.status(404).json({ message: "Collaboration not found" });
+      }
+
+      const updated = await storage.acknowledgeWorkspaceBoundaries(collabId, userId);
+      if (!updated) {
+        return res.status(403).json({ message: "Not authorized to acknowledge boundaries" });
+      }
+
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // === Forum Topics ===
 
   app.get("/api/forums", async (req, res) => {
