@@ -31,7 +31,7 @@ export function Navbar() {
       <div className="container flex h-16 items-center px-4">
         <Link href="/" className="mr-8 flex items-center space-x-2">
           <span className="font-display text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            CreatorSync
+            CollabR18X
           </span>
         </Link>
         

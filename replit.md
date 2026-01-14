@@ -1,8 +1,8 @@
-# CreatorSync
+# CollabR18X
 
 ## Overview
 
-CreatorSync is a creator collaboration platform that enables content creators to discover each other, connect, and manage collaboration requests. The application provides a directory of creator profiles, a collaboration request system with status tracking, and personalized dashboards for managing connections.
+CollabR18X is a creator collaboration platform that enables content creators to discover each other, connect, and manage collaboration requests. The application provides a directory of creator profiles, a collaboration request system with status tracking, and personalized dashboards for managing connections.
 
 ## User Preferences
 

@@ -25,7 +25,7 @@ export default function Landing() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/20">
               C
             </div>
-            <span className="font-display text-2xl font-bold">CreatorSync</span>
+            <span className="font-display text-2xl font-bold">CollabR18X</span>
           </div>
           <a href="/api/login">
             <Button variant="outline" className="font-semibold border-primary/20 hover:bg-primary/5 hover:text-primary transition-all">
