@@ -22,6 +22,7 @@ function HubsListView() {
 
   const { data: myProfile } = useQuery<Profile>({
     queryKey: ["/api/profiles/me"],
+    enabled: !!user,
   });
 
   const { data: hubs, isLoading: isLoadingHubs } = useQuery<LocationHub[]>({

@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useBlockUser } from "@/hooks/use-blocks";
 import { CollabRequestModal } from "@/components/CollabRequestModal";
 import { ConsentDialog, useConsentCheck } from "@/components/ConsentDialog";
+import { useToast } from "@/hooks/use-toast";
+import { redirectToLogin } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +29,7 @@ export default function Profile() {
   const id = parseInt(params?.id || "0");
   const { data: profile, isLoading, error } = useProfile(id);
   const { user } = useAuth();
+  const { toast } = useToast();
   const { mutate: blockUser, isPending: isBlocking } = useBlockUser();
   const { mutate: likeProfile, isPending: isLiking } = useLikeProfile();
   const [, setLocation] = useLocation();
@@ -36,6 +39,10 @@ export default function Profile() {
   const hasConsent = useConsentCheck(profile?.userId || '');
 
   const handleBlock = () => {
+    if (!user) {
+      redirectToLogin(toast);
+      return;
+    }
     if (profile?.userId) {
       blockUser(profile.userId, {
         onSuccess: () => setLocation("/blocked")
@@ -44,6 +51,10 @@ export default function Profile() {
   };
 
   const handleLikeClick = (isSuperLike: boolean) => {
+    if (!user) {
+      redirectToLogin(toast);
+      return;
+    }
     if (!profile?.userId) return;
     
     if (hasConsent) {
@@ -55,6 +66,10 @@ export default function Profile() {
   };
 
   const handleConsentConfirm = () => {
+    if (!user) {
+      redirectToLogin(toast);
+      return;
+    }
     if (profile?.userId && pendingLikeType) {
       likeProfile({ likedId: profile.userId, isSuperLike: pendingLikeType === 'superlike' });
       setPendingLikeType(null);

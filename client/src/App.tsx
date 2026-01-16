@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Navbar } from "@/components/Navbar";
+import { PublicNavbar } from "@/components/PublicNavbar";
 import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
@@ -38,10 +39,27 @@ function Router() {
 
   if (!user) {
     return (
-      <Switch>
-        <Route path="/" component={Landing} />
-        <Route component={Landing} /> {/* Redirect all unauth to landing */}
-      </Switch>
+      <>
+        <PublicNavbar />
+        <main className="min-h-[calc(100vh-80px)] bg-background">
+          <Switch>
+            <Route path="/" component={Landing} />
+            <Route path="/directory" component={Directory} />
+            <Route path="/profile/:id" component={Profile} />
+            <Route path="/community" component={Community} />
+            <Route path="/community/forums" component={Forums} />
+            <Route path="/community/forums/:topicId" component={Forums} />
+            <Route path="/community/forums/posts/:postId" component={Forums} />
+            <Route path="/community/events" component={Events} />
+            <Route path="/community/events/:id" component={Events} />
+            <Route path="/community/safety" component={SafetyAlerts} />
+            <Route path="/community/safety/:id" component={SafetyAlerts} />
+            <Route path="/community/hubs" component={LocalHubs} />
+            <Route path="/community/hubs/:location" component={LocalHubs} />
+            <Route component={Landing} />
+          </Switch>
+        </main>
+      </>
     );
   }
 
