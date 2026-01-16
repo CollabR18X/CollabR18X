@@ -16,6 +16,32 @@ import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
+type ProfilePrivacySettings = {
+  showAge?: boolean;
+  showLocation?: boolean;
+  showBirthDate?: boolean;
+  showOccupation?: boolean;
+  showEducation?: boolean;
+  showHeight?: boolean;
+};
+
+type ProfileBoundaries = {
+  contentTypes: string[];
+  communicationPrefs: string[];
+  collaborationTypes: string[];
+  dealBreakers: string[];
+  safetyRequirements: string[];
+};
+
+type ProfileFormValues = InsertProfile & {
+  privacySettings?: ProfilePrivacySettings;
+  boundaries?: ProfileBoundaries;
+  instagram?: string;
+  twitter?: string;
+  youtube?: string;
+  tiktok?: string;
+};
+
 export default function MyProfile() {
   const { user } = useAuth();
   const { data: profile, isLoading, refetch } = useMyProfile();
@@ -56,7 +82,7 @@ export default function MyProfile() {
   });
   const [dealBreakersText, setDealBreakersText] = useState("");
 
-  const form = useForm<InsertProfile & { instagram?: string; twitter?: string; youtube?: string; tiktok?: string }>({
+  const form = useForm<ProfileFormValues>({
     resolver: zodResolver(insertProfileSchema.extend({})),
     defaultValues: {
       bio: "",

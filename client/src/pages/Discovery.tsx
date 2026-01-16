@@ -582,7 +582,11 @@ export default function Discovery() {
       saveMutation.mutate(profile.userId);
     } else {
       passMutation.mutate(profile.userId);
-      setPassedIds(prev => new Set([...prev, profile.userId]));
+      setPassedIds((prev) => {
+        const next = new Set(prev);
+        next.add(profile.userId);
+        return next;
+      });
     }
 
     setCurrentIndex(prev => prev + 1);
@@ -590,7 +594,11 @@ export default function Discovery() {
 
   const handleLike = (userId: string) => {
     likeMutation.mutate(userId);
-    setPassedIds(prev => new Set([...prev, userId]));
+    setPassedIds((prev) => {
+      const next = new Set(prev);
+      next.add(userId);
+      return next;
+    });
   };
 
   const handleSave = (userId: string) => {
@@ -599,7 +607,11 @@ export default function Discovery() {
 
   const handlePass = (userId: string) => {
     passMutation.mutate(userId);
-    setPassedIds(prev => new Set([...prev, userId]));
+    setPassedIds((prev) => {
+      const next = new Set(prev);
+      next.add(userId);
+      return next;
+    });
   };
 
   const handleApplyFilters = () => {
