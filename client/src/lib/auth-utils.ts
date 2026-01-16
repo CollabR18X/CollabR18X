@@ -1,8 +1,6 @@
-import type { ReactNode } from "react";
-
 type ToastOptions = {
-  title?: ReactNode;
-  description?: ReactNode;
+  title?: string;
+  description?: string;
   variant?: "default" | "destructive" | null;
 };
 
