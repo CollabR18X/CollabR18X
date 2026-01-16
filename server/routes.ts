@@ -7,6 +7,14 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { insertForumTopicSchema, insertForumPostSchema, insertPostReplySchema, insertEventSchema, insertSafetyAlertSchema } from "@shared/schema";
 
+const redactUserEmail = (user?: any) => (user ? { ...user, email: null } : user);
+const redactProfileUser = <T extends { user: any }>(profile: T) => ({
+  ...profile,
+  user: redactUserEmail(profile.user),
+});
+const redactProfilesUser = <T extends { user: any }>(profiles: T[]) =>
+  profiles.map((profile) => redactProfileUser(profile));
+
 // Rate limiting for messages - 30 messages per minute per user
 const messageRateLimits = new Map<string, { count: number; resetTime: number }>();
 const MESSAGE_RATE_LIMIT = 30;
@@ -97,17 +105,24 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.profiles.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.profiles.list.path, async (req, res) => {
     const profiles = await storage.getAllProfiles();
-    res.json(profiles);
+    res.json(redactProfilesUser(profiles));
   });
 
-  app.get(api.profiles.get.path, isAuthenticated, async (req, res) => {
+  app.get(api.profiles.get.path, async (req, res) => {
     const profile = await storage.getProfile(Number(req.params.id));
     if (!profile) {
       return res.status(404).json({ message: "Profile not found" });
     }
-    res.json(profile);
+    if (!profile.isVisible) {
+      const isAuthed = (req as any).isAuthenticated?.() ?? false;
+      const userId = isAuthed ? (req.user as any).claims.sub : undefined;
+      if (!userId || profile.userId !== userId) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+    }
+    res.json(redactProfileUser(profile));
   });
 
   app.put("/api/profiles/location", isAuthenticated, async (req, res) => {
@@ -141,9 +156,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/profiles/nearby", isAuthenticated, async (req, res) => {
+  app.get("/api/profiles/nearby", async (req, res) => {
     try {
-      const userId = (req.user as any).claims.sub;
+      const isAuthed = (req as any).isAuthenticated?.() ?? false;
+      const userId = isAuthed ? (req.user as any).claims.sub : undefined;
       const schema = z.object({
         lat: z.coerce.number().min(-90).max(90),
         lng: z.coerce.number().min(-180).max(180),
@@ -151,7 +167,7 @@ export async function registerRoutes(
       });
       const input = schema.parse(req.query);
       const profiles = await storage.getNearbyProfiles(input.lat, input.lng, input.maxDistance, userId);
-      res.json(profiles);
+      res.json(redactProfilesUser(profiles));
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ 
@@ -165,20 +181,25 @@ export async function registerRoutes(
 
   // === Location Hubs ===
 
-  app.get("/api/profiles/by-location", isAuthenticated, async (req, res) => {
+  app.get("/api/profiles/by-location", async (req, res) => {
     try {
       const hubs = await storage.getProfilesByLocation();
-      res.json(hubs);
+      res.json(
+        hubs.map((hub) => ({
+          ...hub,
+          profiles: redactProfilesUser(hub.profiles),
+        }))
+      );
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
   });
 
-  app.get("/api/profiles/by-location/:location", isAuthenticated, async (req, res) => {
+  app.get("/api/profiles/by-location/:location", async (req, res) => {
     try {
       const location = decodeURIComponent(req.params.location);
       const profiles = await storage.getProfilesInLocation(location);
-      res.json(profiles);
+      res.json(redactProfilesUser(profiles));
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -642,7 +663,12 @@ export async function registerRoutes(
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
       const offset = req.query.offset ? Number(req.query.offset) : undefined;
       const posts = await storage.getForumPosts(topicId, { limit, offset });
-      res.json(posts);
+      res.json(
+        posts.map((post) => ({
+          ...post,
+          author: redactUserEmail(post.author),
+        }))
+      );
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -674,7 +700,14 @@ export async function registerRoutes(
       if (!post) {
         return res.status(404).json({ message: "Post not found" });
       }
-      res.json(post);
+      res.json({
+        ...post,
+        author: redactUserEmail(post.author),
+        replies: post.replies?.map((reply) => ({
+          ...reply,
+          author: redactUserEmail(reply.author),
+        })),
+      });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -782,7 +815,12 @@ export async function registerRoutes(
         filters.isVirtual = req.query.isVirtual === 'true';
       }
       const events = await storage.getEvents(filters);
-      res.json(events);
+      res.json(
+        events.map((event) => ({
+          ...event,
+          creator: redactUserEmail(event.creator),
+        }))
+      );
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -812,7 +850,14 @@ export async function registerRoutes(
       if (!event) {
         return res.status(404).json({ message: "Event not found" });
       }
-      res.json(event);
+      res.json({
+        ...event,
+        creator: redactUserEmail(event.creator),
+        attendees: event.attendees?.map((attendee) => ({
+          ...attendee,
+          user: redactUserEmail(attendee.user),
+        })),
+      });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -889,7 +934,12 @@ export async function registerRoutes(
         filters.isResolved = req.query.isResolved === 'true';
       }
       const alerts = await storage.getSafetyAlerts(filters);
-      res.json(alerts);
+      res.json(
+        alerts.map((alert) => ({
+          ...alert,
+          reporter: redactUserEmail(alert.reporter),
+        }))
+      );
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -919,7 +969,10 @@ export async function registerRoutes(
       if (!alert) {
         return res.status(404).json({ message: "Safety alert not found" });
       }
-      res.json(alert);
+      res.json({
+        ...alert,
+        reporter: redactUserEmail(alert.reporter),
+      });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }

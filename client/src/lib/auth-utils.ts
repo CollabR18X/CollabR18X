@@ -1,9 +1,15 @@
+type ToastOptions = {
+  title?: string;
+  description?: string;
+  variant?: "default" | "destructive" | null;
+};
+
 export function isUnauthorizedError(error: Error): boolean {
   return /^401: .*Unauthorized/.test(error.message);
 }
 
 // Redirect to login with a toast notification
-export function redirectToLogin(toast?: (options: { title: string; description: string; variant: string }) => void) {
+export function redirectToLogin(toast?: (options: ToastOptions) => void) {
   if (toast) {
     toast({
       title: "Unauthorized",

@@ -41,7 +41,7 @@ export interface IStorage {
   createProfile(userId: string, profile: InsertProfile): Promise<Profile>;
   updateProfile(userId: string, updates: Partial<InsertProfile>): Promise<Profile>;
   updateProfileLocation(userId: string, lat: number, lng: number): Promise<Profile>;
-  getNearbyProfiles(lat: number, lng: number, maxDistance: number, userId: string): Promise<(Profile & { user: User; distance: number })[]>;
+  getNearbyProfiles(lat: number, lng: number, maxDistance: number, userId?: string): Promise<(Profile & { user: User; distance: number })[]>;
 
   // Saved Profiles
   saveProfile(userId: string, savedUserId: string): Promise<SavedProfile>;
@@ -408,15 +408,19 @@ export class DatabaseStorage implements IStorage {
     return deg * (Math.PI / 180);
   }
 
-  async getNearbyProfiles(lat: number, lng: number, maxDistance: number, userId: string): Promise<(Profile & { user: User; distance: number })[]> {
-    const blockedByMe = await db.select({ blockedId: blocks.blockedId }).from(blocks).where(eq(blocks.blockerId, userId));
-    const blockedMe = await db.select({ blockerId: blocks.blockerId }).from(blocks).where(eq(blocks.blockedId, userId));
-    
-    const excludeIds = [
-      userId,
-      ...blockedByMe.map(b => b.blockedId),
-      ...blockedMe.map(b => b.blockerId)
-    ];
+  async getNearbyProfiles(lat: number, lng: number, maxDistance: number, userId?: string): Promise<(Profile & { user: User; distance: number })[]> {
+    const excludeIds: string[] = [];
+
+    if (userId) {
+      const blockedByMe = await db.select({ blockedId: blocks.blockedId }).from(blocks).where(eq(blocks.blockerId, userId));
+      const blockedMe = await db.select({ blockerId: blocks.blockerId }).from(blocks).where(eq(blocks.blockedId, userId));
+
+      excludeIds.push(
+        userId,
+        ...blockedByMe.map(b => b.blockedId),
+        ...blockedMe.map(b => b.blockerId)
+      );
+    }
 
     const uniqueExcludeIds = Array.from(new Set(excludeIds));
 

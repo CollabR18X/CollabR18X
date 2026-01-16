@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useCreateCollaboration } from "@/hooks/use-collaborations";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { redirectToLogin } from "@/lib/auth-utils";
 import {
   Dialog,
   DialogContent,
@@ -23,10 +26,24 @@ interface CollabRequestModalProps {
 export function CollabRequestModal({ receiverId, receiverName, trigger }: CollabRequestModalProps) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const { user } = useAuth();
+  const { toast } = useToast();
   const { mutate, isPending } = useCreateCollaboration();
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen && !user) {
+      redirectToLogin(toast);
+      return;
+    }
+    setOpen(nextOpen);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      redirectToLogin(toast);
+      return;
+    }
     mutate(
       { receiverId, message },
       {
@@ -39,7 +56,7 @@ export function CollabRequestModal({ receiverId, receiverName, trigger }: Collab
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger || <Button>Connect</Button>}
       </DialogTrigger>

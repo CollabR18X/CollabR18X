@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Sparkles, Users, Zap, ArrowRight, MessageSquare } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Landing() {
   const container = {
@@ -18,23 +19,6 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden">
-      {/* Navbar */}
-      <nav className="fixed w-full z-50 bg-background/50 backdrop-blur-md border-b border-white/10">
-        <div className="container mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/20">
-              C
-            </div>
-            <span className="font-display text-2xl font-bold">CollabR18X</span>
-          </div>
-          <a href="/api/login">
-            <Button variant="outline" className="font-semibold border-primary/20 hover:bg-primary/5 hover:text-primary transition-all">
-              Login
-            </Button>
-          </a>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary/20 blur-[120px] rounded-full -z-10 opacity-50" />
@@ -66,9 +50,11 @@ export default function Landing() {
                   Start Collaborating <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </a>
-              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 text-lg rounded-2xl hover:bg-muted/50">
-                View Directory
-              </Button>
+              <Link href="/directory" className="w-full sm:w-auto">
+                <Button size="lg" variant="ghost" className="w-full h-14 px-8 text-lg rounded-2xl hover:bg-muted/50">
+                  View Directory
+                </Button>
+              </Link>
             </motion.div>
           </motion.div>
         </div>
