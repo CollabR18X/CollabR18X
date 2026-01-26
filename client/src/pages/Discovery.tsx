@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,6 @@ import {
   X,
   Bookmark,
   Grid3X3,
-  Layers,
   MapPin,
   Filter,
   ChevronRight,
@@ -68,147 +66,6 @@ interface Filters {
   availability: string[];
   travelMode: string[];
   monetization: string[];
-}
-
-function SwipeCard({
-  profile,
-  onSwipe,
-  isTop,
-}: {
-  profile: ProfileWithUser;
-  onSwipe: (direction: "left" | "right" | "up") => void;
-  isTop: boolean;
-}) {
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-25, 25]);
-  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
-
-  const likeOpacity = useTransform(x, [0, 100], [0, 1]);
-  const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
-  const saveOpacity = useTransform(y, [-100, 0], [1, 0]);
-
-  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const threshold = 100;
-    if (info.offset.x > threshold) {
-      onSwipe("right");
-    } else if (info.offset.x < -threshold) {
-      onSwipe("left");
-    } else if (info.offset.y < -threshold) {
-      onSwipe("up");
-    }
-  };
-
-  if (!isTop) {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <Card className="w-full max-w-sm h-[500px] shadow-xl scale-95 opacity-50">
-          <div className="h-full bg-gradient-to-b from-primary/5 to-accent/5" />
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <motion.div
-      className="absolute inset-0 flex items-center justify-center cursor-grab active:cursor-grabbing"
-      style={{ x, y, rotate, opacity }}
-      drag={isTop}
-      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-      dragElastic={0.7}
-      onDragEnd={handleDragEnd}
-      whileTap={{ scale: 1.02 }}
-    >
-      <Card className="w-full max-w-sm h-[500px] overflow-hidden shadow-xl relative">
-        <motion.div
-          className="absolute top-6 left-6 z-10 px-4 py-2 bg-green-500 text-white font-bold rounded-lg border-2 border-white"
-          style={{ opacity: likeOpacity, rotate: -12 }}
-        >
-          INTERESTED
-        </motion.div>
-        <motion.div
-          className="absolute top-6 right-6 z-10 px-4 py-2 bg-red-500 text-white font-bold rounded-lg border-2 border-white"
-          style={{ opacity: nopeOpacity, rotate: 12 }}
-        >
-          PASS
-        </motion.div>
-        <motion.div
-          className="absolute top-6 left-1/2 -translate-x-1/2 z-10 px-4 py-2 bg-blue-500 text-white font-bold rounded-lg border-2 border-white"
-          style={{ opacity: saveOpacity }}
-        >
-          SAVE
-        </motion.div>
-
-        <div className="h-3/5 relative bg-gradient-to-br from-primary/10 to-accent/10">
-          {profile.photos && profile.photos.length > 0 ? (
-            <img
-              src={profile.photos[0]}
-              alt={profile.user.firstName || "Profile"}
-              className="w-full h-full object-cover"
-              draggable={false}
-            />
-          ) : profile.user.profileImageUrl ? (
-            <img
-              src={profile.user.profileImageUrl}
-              alt={profile.user.firstName || "Profile"}
-              className="w-full h-full object-cover"
-              draggable={false}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
-              <span className="text-6xl font-bold text-primary/50">
-                {profile.user.firstName?.[0] || "?"}
-              </span>
-            </div>
-          )}
-          {profile.matchScore > 0 && (
-            <div className="absolute bottom-3 right-3">
-              <Badge className="bg-primary/90 text-white">
-                <Sparkles className="h-3 w-3 mr-1" />
-                {profile.matchScore}% match
-              </Badge>
-            </div>
-          )}
-        </div>
-
-        <CardContent className="h-2/5 flex flex-col justify-between p-4">
-          <div>
-            <h3 className="text-xl font-bold">
-              {profile.user.firstName} {profile.user.lastName}
-            </h3>
-            <p className="text-accent font-medium text-sm">{profile.niche || "Creator"}</p>
-            {profile.location && (
-              <p className="text-muted-foreground text-sm flex items-center mt-1">
-                <MapPin className="h-3 w-3 mr-1" />
-                {profile.location}
-              </p>
-            )}
-            {profile.bio && (
-              <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{profile.bio}</p>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {profile.experienceLevel && (
-              <Badge variant="secondary" className="text-xs">
-                {EXPERIENCE_LEVELS.find(e => e.value === profile.experienceLevel)?.label || profile.experienceLevel}
-              </Badge>
-            )}
-            {profile.availability && (
-              <Badge variant="outline" className="text-xs">
-                {AVAILABILITY_OPTIONS.find(a => a.value === profile.availability)?.label || profile.availability}
-              </Badge>
-            )}
-            {profile.monetizationExpectation && (
-              <Badge variant="outline" className="text-xs">
-                {MONETIZATION_OPTIONS.find(m => m.value === profile.monetizationExpectation)?.label || profile.monetizationExpectation}
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
 }
 
 function ProfileCard({
@@ -470,8 +327,6 @@ function FilterPanel({
 export default function Discovery() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [mode, setMode] = useState<"swipe" | "browse">("swipe");
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatchPopup, setShowMatchPopup] = useState(false);
   const [matchedUser, setMatchedUser] = useState<User | null>(null);
   const [passedIds, setPassedIds] = useState<Set<string>>(new Set());
@@ -572,21 +427,6 @@ export default function Discovery() {
     onSuccess: () => {},
   });
 
-  const handleSwipe = (direction: "left" | "right" | "up") => {
-    const profile = filteredProfiles[currentIndex];
-    if (!profile) return;
-
-    if (direction === "right") {
-      likeMutation.mutate(profile.userId);
-    } else if (direction === "up") {
-      saveMutation.mutate(profile.userId);
-    } else {
-      passMutation.mutate(profile.userId);
-      setPassedIds(prev => new Set([...prev, profile.userId]));
-    }
-
-    setCurrentIndex(prev => prev + 1);
-  };
 
   const handleLike = (userId: string) => {
     likeMutation.mutate(userId);
@@ -604,12 +444,9 @@ export default function Discovery() {
 
   const handleApplyFilters = () => {
     setAppliedFilters(filters);
-    setCurrentIndex(0);
     setPassedIds(new Set());
   };
 
-  const currentProfile = filteredProfiles[currentIndex];
-  const nextProfile = filteredProfiles[currentIndex + 1];
   const isPending = likeMutation.isPending || saveMutation.isPending || passMutation.isPending;
 
   return (
@@ -642,97 +479,14 @@ export default function Discovery() {
             </SheetContent>
           </Sheet>
 
-          <div className="flex border rounded-lg overflow-hidden">
-            <Button
-              variant={mode === "swipe" ? "default" : "ghost"}
-              size="sm"
-              className="rounded-none"
-              onClick={() => setMode("swipe")}
-              data-testid="button-swipe-mode"
-            >
-              <Layers className="h-4 w-4 mr-2" />
-              Swipe
-            </Button>
-            <Button
-              variant={mode === "browse" ? "default" : "ghost"}
-              size="sm"
-              className="rounded-none"
-              onClick={() => setMode("browse")}
-              data-testid="button-browse-mode"
-            >
-              <Grid3X3 className="h-4 w-4 mr-2" />
-              Browse
-            </Button>
-          </div>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center items-center h-[500px]">
-          <Skeleton className="w-full max-w-sm h-[500px] rounded-xl" />
-        </div>
-      ) : mode === "swipe" ? (
-        <div className="flex flex-col items-center">
-          <div className="relative w-full max-w-sm h-[500px]">
-            {filteredProfiles.length === 0 || currentIndex >= filteredProfiles.length ? (
-              <Card className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
-                <Sparkles className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No More Profiles</h3>
-                <p className="text-muted-foreground mb-4">
-                  You've seen all available creators. Check back later or adjust your filters.
-                </p>
-                <Button onClick={() => { setCurrentIndex(0); setPassedIds(new Set()); refetch(); }} data-testid="button-refresh-discover">
-                  Refresh
-                </Button>
-              </Card>
-            ) : (
-              <>
-                {nextProfile && <SwipeCard key={nextProfile.id + "-next"} profile={nextProfile} onSwipe={() => {}} isTop={false} />}
-                {currentProfile && (
-                  <SwipeCard
-                    key={currentProfile.id}
-                    profile={currentProfile}
-                    onSwipe={handleSwipe}
-                    isTop={true}
-                  />
-                )}
-              </>
-            )}
-          </div>
-
-          {currentProfile && (
-            <div className="flex gap-4 mt-8">
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-16 w-16 rounded-full"
-                onClick={() => handleSwipe("left")}
-                disabled={isPending}
-                data-testid="button-swipe-pass"
-              >
-                <X className="h-8 w-8 text-red-500" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-14 w-14 rounded-full"
-                onClick={() => handleSwipe("up")}
-                disabled={isPending}
-                data-testid="button-swipe-save"
-              >
-                <Bookmark className="h-6 w-6 text-blue-500" />
-              </Button>
-              <Button
-                size="lg"
-                className="h-16 w-16 rounded-full"
-                onClick={() => handleSwipe("right")}
-                disabled={isPending}
-                data-testid="button-swipe-interested"
-              >
-                <Heart className="h-8 w-8" />
-              </Button>
-            </div>
-          )}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <Skeleton key={i} className="w-full h-[400px] rounded-xl" />
+          ))}
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -766,12 +520,7 @@ export default function Discovery() {
         <DialogContent className="text-center max-w-sm">
           <div className="py-6">
             <div className="relative mx-auto w-24 h-24 mb-4">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                className="absolute inset-0"
-              >
+              <div className="absolute inset-0">
                 {matchedUser?.profileImageUrl ? (
                   <img
                     src={matchedUser.profileImageUrl}
@@ -783,13 +532,9 @@ export default function Discovery() {
                     {matchedUser?.firstName?.[0] || "?"}
                   </div>
                 )}
-              </motion.div>
+              </div>
             </div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
+            <div>
               <h2 className="text-2xl font-bold mb-2">It's a Match!</h2>
               <p className="text-muted-foreground mb-6">
                 You and {matchedUser?.firstName} are both interested in collaborating!
@@ -805,7 +550,7 @@ export default function Discovery() {
                   </Button>
                 </Link>
               </div>
-            </motion.div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

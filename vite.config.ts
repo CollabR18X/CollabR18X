@@ -3,21 +3,21 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+// Conditionally load Replit plugins (avoiding top-level await)
+const getReplitPlugins = () => {
+  if (process.env.NODE_ENV === "production" || !process.env.REPL_ID) {
+    return [];
+  }
+  // These will be loaded dynamically by Vite if needed
+  // For now, we'll skip them to avoid esbuild issues
+  return [];
+};
+
 export default defineConfig({
   plugins: [
     react(),
     runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
+    ...getReplitPlugins(),
   ],
   resolve: {
     alias: {
@@ -35,6 +35,17 @@ export default defineConfig({
     fs: {
       strict: true,
       deny: ["**/.*"],
+    },
+    host: "127.0.0.1", // Use localhost for Windows compatibility
+    port: 5173,
+    // Proxy API requests to Python backend in development
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:5000", // Use IPv4 explicitly
+        changeOrigin: true,
+        secure: false,
+        ws: true, // Enable WebSocket proxying
+      },
     },
   },
 });

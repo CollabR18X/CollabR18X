@@ -22,7 +22,7 @@ export function useBlockUser() {
       const res = await fetch(api.blocks.create.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blockedId }),
+        body: JSON.stringify({ blocked_id: blockedId }),
         credentials: "include",
       });
       if (!res.ok) {

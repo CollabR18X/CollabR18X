@@ -27,11 +27,18 @@ export default function Landing() {
             </div>
             <span className="font-display text-2xl font-bold">CollabR18X</span>
           </div>
-          <a href="/api/login">
-            <Button variant="outline" className="font-semibold border-primary/20 hover:bg-primary/5 hover:text-primary transition-all">
-              Login
-            </Button>
-          </a>
+          <div className="flex items-center gap-2">
+            <a href="/login">
+              <Button variant="ghost" className="font-semibold hover:bg-primary/5 hover:text-primary transition-all">
+                Login
+              </Button>
+            </a>
+            <a href="/register">
+              <Button variant="outline" className="font-semibold border-primary/20 hover:bg-primary/5 hover:text-primary transition-all">
+                Sign Up
+              </Button>
+            </a>
+          </div>
         </div>
       </nav>
 
@@ -61,14 +68,16 @@ export default function Landing() {
             </motion.p>
             
             <motion.div variants={item} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <a href="/api/login" className="w-full sm:w-auto">
+              <a href="/register" className="w-full sm:w-auto">
                 <Button size="lg" className="w-full h-14 px-8 text-lg rounded-2xl bg-gradient-to-r from-primary to-accent shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-1 transition-all">
-                  Start Collaborating <ArrowRight className="ml-2 w-5 h-5" />
+                  Get Started <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </a>
-              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 text-lg rounded-2xl hover:bg-muted/50">
-                View Directory
-              </Button>
+              <a href="/login" className="w-full sm:w-auto">
+                <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 text-lg rounded-2xl hover:bg-muted/50">
+                  Sign In
+                </Button>
+              </a>
             </motion.div>
           </motion.div>
         </div>

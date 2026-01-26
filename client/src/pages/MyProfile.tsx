@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle, Camera, X, Plus, Eye, EyeOff, Shield, Lock } from "lucide-react";
+import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle, Camera, X, Plus, Eye, EyeOff, Shield, Lock, MessageCircle, Image as ImageIcon, PlayCircle, Heart, CreditCard, Linkedin, Mail } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -56,7 +56,7 @@ export default function MyProfile() {
   });
   const [dealBreakersText, setDealBreakersText] = useState("");
 
-  const form = useForm<InsertProfile & { instagram?: string; twitter?: string; youtube?: string; tiktok?: string }>({
+  const form = useForm<InsertProfile & { instagram?: string; twitter?: string; youtube?: string; tiktok?: string; twitch?: string; discord?: string; pinterest?: string; onlyfans?: string; fansly?: string; patreon?: string; linkedin?: string; whatsapp?: string; email?: string; displayName?: string }>({
     resolver: zodResolver(insertProfileSchema.extend({})),
     defaultValues: {
       bio: "",
@@ -69,6 +69,7 @@ export default function MyProfile() {
       gender: "",
       lookingFor: "",
       isVisible: true,
+      displayName: "",
       privacySettings: {
         showAge: true,
         showLocation: true,
@@ -101,11 +102,21 @@ export default function MyProfile() {
         twitter: socials.twitter || "",
         youtube: socials.youtube || "",
         tiktok: socials.tiktok || "",
+        twitch: socials.twitch || "",
+        discord: socials.discord || "",
+        pinterest: socials.pinterest || "",
+        onlyfans: socials.onlyfans || "",
+        fansly: socials.fansly || "",
+        patreon: socials.patreon || "",
+        linkedin: socials.linkedin || "",
+        whatsapp: socials.whatsapp || "",
+        email: socials.email || "",
         isNsfw: profile.isNsfw || false,
         interests: profile.interests || [],
         gender: profile.gender || "",
         lookingFor: profile.lookingFor || "",
         isVisible: profile.isVisible ?? true,
+        displayName: profile.user?.displayName || "",
         privacySettings: profile.privacySettings || {
           showAge: true,
           showLocation: true,
@@ -196,46 +207,124 @@ export default function MyProfile() {
   };
 
   const saveProfile = useCallback((data: any, force = false) => {
+    // Always allow saving when force is true (manual save button)
     if (!profile && !force) return;
     
-    const { instagram, twitter, youtube, tiktok, ...rest } = data;
+    const { instagram, twitter, youtube, tiktok, twitch, discord, pinterest, onlyfans, fansly, patreon, linkedin, whatsapp, email, ...rest } = data;
     const socialLinks: Record<string, string> = {};
     if (instagram) socialLinks.instagram = instagram;
     if (twitter) socialLinks.twitter = twitter;
     if (youtube) socialLinks.youtube = youtube;
     if (tiktok) socialLinks.tiktok = tiktok;
+    if (twitch) socialLinks.twitch = twitch;
+    if (discord) socialLinks.discord = discord;
+    if (pinterest) socialLinks.pinterest = pinterest;
+    if (onlyfans) socialLinks.onlyfans = onlyfans;
+    if (fansly) socialLinks.fansly = fansly;
+    if (patreon) socialLinks.patreon = patreon;
+    if (linkedin) socialLinks.linkedin = linkedin;
+    if (whatsapp) socialLinks.whatsapp = whatsapp;
+    if (email) socialLinks.email = email;
 
+    // When force is true (manual save), include ALL fields from the form
+    if (force) {
+      const fullPayload: Record<string, any> = {
+        ...rest,
+        socialLinks,
+        boundaries, // Include boundaries in manual save
+        interests: rest.interests || [],
+        gender: rest.gender || "",
+        lookingFor: rest.lookingFor || "",
+        privacySettings: rest.privacySettings || {},
+      };
+      // Remove undefined values but keep empty strings and empty arrays
+      Object.keys(fullPayload).forEach(key => {
+        if (fullPayload[key] === undefined) {
+          delete fullPayload[key];
+        }
+      });
+      
+      setAutoSaveStatus('saving');
+      mutate(fullPayload, {
+        onSuccess: () => {
+          setAutoSaveStatus('saved');
+          toast({
+            title: "Profile saved",
+            description: "All your changes have been saved successfully.",
+          });
+          setTimeout(() => {
+            setAutoSaveStatus('idle');
+            refetch(); // Refresh profile data after save to show updated values
+          }, 2000);
+        },
+        onError: (error: any) => {
+          setAutoSaveStatus('idle');
+          const errorMessage = error?.message || error?.detail || "Your changes could not be saved. Please try again.";
+          toast({
+            title: "Failed to save",
+            description: errorMessage,
+            variant: "destructive",
+          });
+        }
+      });
+      return;
+    }
+
+    // Auto-save: only include changed fields
     const updatePayload: Record<string, any> = {};
     
+    // Check all fields for changes
+    if (rest.displayName !== undefined && rest.displayName !== (profile?.user?.displayName || "")) updatePayload.displayName = rest.displayName;
     if (rest.bio !== undefined && rest.bio !== (profile?.bio || "")) updatePayload.bio = rest.bio;
     if (rest.niche !== undefined && rest.niche !== (profile?.niche || "")) updatePayload.niche = rest.niche;
     if (rest.portfolioUrl !== undefined && rest.portfolioUrl !== (profile?.portfolioUrl || "")) updatePayload.portfolioUrl = rest.portfolioUrl;
     if (rest.location !== undefined && rest.location !== (profile?.location || "")) updatePayload.location = rest.location;
     if (rest.isNsfw !== undefined && rest.isNsfw !== profile?.isNsfw) updatePayload.isNsfw = rest.isNsfw;
     if (rest.isVisible !== undefined && rest.isVisible !== profile?.isVisible) updatePayload.isVisible = rest.isVisible;
+    if (rest.gender !== undefined && rest.gender !== (profile?.gender || "")) updatePayload.gender = rest.gender;
+    if (rest.lookingFor !== undefined && rest.lookingFor !== (profile?.lookingFor || "")) updatePayload.lookingFor = rest.lookingFor;
     
+    // Check interests array
+    const currentInterests = profile?.interests || [];
+    const interestsChanged = JSON.stringify(rest.interests || []) !== JSON.stringify(currentInterests);
+    if (interestsChanged && rest.interests !== undefined) updatePayload.interests = rest.interests;
+    
+    // Check privacy settings
+    const currentPrivacySettings = profile?.privacySettings || {};
+    const privacyChanged = JSON.stringify(rest.privacySettings || {}) !== JSON.stringify(currentPrivacySettings);
+    if (privacyChanged && rest.privacySettings !== undefined) updatePayload.privacySettings = rest.privacySettings;
+    
+    // Check social links
     const currentSocials = profile?.socialLinks as Record<string, string> || {};
     const socialsChanged = JSON.stringify(socialLinks) !== JSON.stringify(currentSocials);
     if (socialsChanged) updatePayload.socialLinks = socialLinks;
     
-    if (Object.keys(updatePayload).length === 0 && !force) return;
+    // Include boundaries if they've changed (handled separately but should be in payload)
+    const currentBoundaries = profile?.boundaries as any || {};
+    const boundariesChanged = JSON.stringify(boundaries) !== JSON.stringify(currentBoundaries);
+    if (boundariesChanged) updatePayload.boundaries = boundaries;
+    
+    if (Object.keys(updatePayload).length === 0) return;
 
     setAutoSaveStatus('saving');
-    mutate(force ? { ...rest, socialLinks } : updatePayload, {
+    mutate(updatePayload, {
       onSuccess: () => {
         setAutoSaveStatus('saved');
+        // Silently refresh profile data after auto-save to show updated values
+        refetch();
         setTimeout(() => setAutoSaveStatus('idle'), 2000);
       },
-      onError: () => {
+      onError: (error: any) => {
         setAutoSaveStatus('idle');
+        const errorMessage = error?.message || error?.detail || "Your changes could not be saved. Please try again.";
         toast({
           title: "Failed to save",
-          description: "Your changes could not be saved. Please try again.",
+          description: errorMessage,
           variant: "destructive",
         });
       }
     });
-  }, [mutate, toast, profile]);
+  }, [mutate, toast, profile, refetch]);
 
   const debouncedSave = useCallback((data: any) => {
     if (saveTimeoutRef.current) {
@@ -261,6 +350,16 @@ export default function MyProfile() {
   }, [form, debouncedSave, profile]);
 
   const onSubmit = (data: any) => {
+    // Ensure user is authenticated before saving
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to save your profile.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -363,6 +462,23 @@ export default function MyProfile() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="displayName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Display Name</FormLabel>
+                    <FormControl>
+                      <Input data-testid="input-display-name" placeholder="Your display name (optional)" {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormDescription>
+                      This name will be shown to other users. If left empty, your first and last name will be used.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -441,7 +557,7 @@ export default function MyProfile() {
                       <FormControl>
                         <div className="relative">
                           <Instagram className="absolute left-3 top-3 h-4 w-4 text-pink-500" />
-                          <Input data-testid="input-instagram" className="pl-9" placeholder="Instagram username" {...field} value={field.value || ""} />
+                          <Input data-testid="input-instagram" className="pl-9" placeholder="Instagram link" {...field} value={field.value || ""} />
                         </div>
                       </FormControl>
                     </FormItem>
@@ -451,7 +567,7 @@ export default function MyProfile() {
                       <FormControl>
                         <div className="relative">
                           <Twitter className="absolute left-3 top-3 h-4 w-4 text-blue-400" />
-                          <Input data-testid="input-twitter" className="pl-9" placeholder="Twitter/X username" {...field} value={field.value || ""} />
+                          <Input data-testid="input-twitter" className="pl-9" placeholder="Twitter/X link" {...field} value={field.value || ""} />
                         </div>
                       </FormControl>
                     </FormItem>
@@ -461,7 +577,7 @@ export default function MyProfile() {
                       <FormControl>
                         <div className="relative">
                           <Youtube className="absolute left-3 top-3 h-4 w-4 text-red-500" />
-                          <Input data-testid="input-youtube" className="pl-9" placeholder="YouTube channel" {...field} value={field.value || ""} />
+                          <Input data-testid="input-youtube" className="pl-9" placeholder="YouTube link" {...field} value={field.value || ""} />
                         </div>
                       </FormControl>
                     </FormItem>
@@ -471,7 +587,97 @@ export default function MyProfile() {
                       <FormControl>
                         <div className="relative">
                           <Music2 className="absolute left-3 top-3 h-4 w-4 text-black dark:text-white" />
-                          <Input data-testid="input-tiktok" className="pl-9" placeholder="TikTok username" {...field} value={field.value || ""} />
+                          <Input data-testid="input-tiktok" className="pl-9" placeholder="TikTok link" {...field} value={field.value || ""} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField name="twitch" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <PlayCircle className="absolute left-3 top-3 h-4 w-4 text-purple-500" />
+                          <Input data-testid="input-twitch" className="pl-9" placeholder="Twitch link" {...field} value={field.value || ""} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField name="discord" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <MessageCircle className="absolute left-3 top-3 h-4 w-4 text-indigo-500" />
+                          <Input data-testid="input-discord" className="pl-9" placeholder="Discord link" {...field} value={field.value || ""} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField name="pinterest" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <ImageIcon className="absolute left-3 top-3 h-4 w-4 text-red-600" />
+                          <Input data-testid="input-pinterest" className="pl-9" placeholder="Pinterest link" {...field} value={field.value || ""} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField name="onlyfans" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <CreditCard className="absolute left-3 top-3 h-4 w-4 text-blue-500" />
+                          <Input data-testid="input-onlyfans" className="pl-9" placeholder="OnlyFans link" {...field} value={field.value || ""} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField name="fansly" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <Heart className="absolute left-3 top-3 h-4 w-4 text-pink-500" />
+                          <Input data-testid="input-fansly" className="pl-9" placeholder="Fansly link" {...field} value={field.value || ""} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField name="patreon" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <Heart className="absolute left-3 top-3 h-4 w-4 text-orange-500" />
+                          <Input data-testid="input-patreon" className="pl-9" placeholder="Patreon link" {...field} value={field.value || ""} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField name="linkedin" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <Linkedin className="absolute left-3 top-3 h-4 w-4 text-blue-600" />
+                          <Input data-testid="input-linkedin" className="pl-9" placeholder="LinkedIn link" {...field} value={field.value || ""} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField name="whatsapp" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <MessageCircle className="absolute left-3 top-3 h-4 w-4 text-green-500" />
+                          <Input data-testid="input-whatsapp" className="pl-9" placeholder="WhatsApp link" {...field} value={field.value || ""} />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField name="email" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-3 h-4 w-4 text-blue-500" />
+                          <Input data-testid="input-email" className="pl-9" placeholder="Email address" {...field} value={field.value || ""} />
                         </div>
                       </FormControl>
                     </FormItem>

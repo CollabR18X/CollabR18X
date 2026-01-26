@@ -1,9 +1,15 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-async function throwIfResNotOk(res: Response) {
+async function throwIfResNotOk(res: Response, url?: string) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    const errorMessage = url 
+      ? `[${res.status}] ${res.statusText} - Route: ${url}\nDetails: ${text}`
+      : `${res.status}: ${text}`;
+    const error = new Error(errorMessage);
+    (error as any).status = res.status;
+    (error as any).url = url || res.url;
+    throw error;
   }
 }
 
@@ -19,7 +25,7 @@ export async function apiRequest(
     credentials: "include",
   });
 
-  await throwIfResNotOk(res);
+  await throwIfResNotOk(res, url);
   return res;
 }
 
@@ -29,7 +35,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+    const res = await fetch(url, {
       credentials: "include",
     });
 
@@ -37,7 +44,7 @@ export const getQueryFn: <T>(options: {
       return null;
     }
 
-    await throwIfResNotOk(res);
+    await throwIfResNotOk(res, url);
     return await res.json();
   };
 
@@ -49,9 +56,25 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: Infinity,
       retry: false,
+      onError: (error: any) => {
+        // Log route errors to console for debugging
+        if (error?.url) {
+          console.error(`[Query Error] Route: ${error.url}`, error);
+        } else {
+          console.error("[Query Error]", error);
+        }
+      },
     },
     mutations: {
       retry: false,
+      onError: (error: any) => {
+        // Log mutation errors to console for debugging
+        if (error?.url) {
+          console.error(`[Mutation Error] Route: ${error.url}`, error);
+        } else {
+          console.error("[Mutation Error]", error);
+        }
+      },
     },
   },
 });

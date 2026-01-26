@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
-import { MessageSquare, Heart, User, Plus, ArrowLeft, Trash2, Loader2 } from "lucide-react";
+import { MessageSquare, Heart, User, Plus, ArrowLeft, Trash2, Loader2, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,52 @@ function ForumsListView() {
   const { data: topics, isLoading } = useQuery<TopicWithCount[]>({
     queryKey: ["/api/forums"],
   });
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newForumName, setNewForumName] = useState("");
+  const [newForumDescription, setNewForumDescription] = useState("");
+  const [newForumIcon, setNewForumIcon] = useState("📝");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const createForumMutation = useMutation({
+    mutationFn: async (data: { name: string; description: string; icon: string }) => {
+      const res = await apiRequest("POST", "/api/forums", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forums"] });
+      toast({ title: "Forum created successfully!" });
+      setIsCreateDialogOpen(false);
+      setNewForumName("");
+      setNewForumDescription("");
+      setNewForumIcon("📝");
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Failed to create forum", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleCreateForum = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newForumName.trim() || !newForumDescription.trim()) {
+      toast({
+        title: "Validation error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    createForumMutation.mutate({
+      name: newForumName.trim(),
+      description: newForumDescription.trim(),
+      icon: newForumIcon.trim() || "📝",
+    });
+  };
 
   if (isLoading) {
     return (
@@ -65,38 +111,160 @@ function ForumsListView() {
     );
   }
 
+  // Filter forums based on search query
+  const filteredTopics = topics?.filter((topic) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      topic.name.toLowerCase().includes(query) ||
+      topic.description.toLowerCase().includes(query)
+    );
+  }) || [];
+
   return (
     <div className="container mx-auto px-4 py-8" data-testid="forums-list-view">
-      <div className="mb-8">
-        <h1 className="font-display text-4xl font-bold">Community Forums</h1>
-        <p className="text-muted-foreground mt-2">Join discussions with fellow creators on various topics.</p>
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="font-display text-4xl font-bold">Community Forums</h1>
+          <p className="text-muted-foreground mt-2">Join discussions with fellow creators on various topics.</p>
+        </div>
+        {user && (
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90">
+                <Plus className="mr-2 h-4 w-4" />
+                Start a Forum
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Forum</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreateForum} className="space-y-4">
+                <div>
+                  <label htmlFor="forum-name" className="text-sm font-medium">
+                    Forum Name *
+                  </label>
+                  <Input
+                    id="forum-name"
+                    value={newForumName}
+                    onChange={(e) => setNewForumName(e.target.value)}
+                    placeholder="e.g., Photography Tips"
+                    required
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="forum-description" className="text-sm font-medium">
+                    Description *
+                  </label>
+                  <Textarea
+                    id="forum-description"
+                    value={newForumDescription}
+                    onChange={(e) => setNewForumDescription(e.target.value)}
+                    placeholder="Describe what this forum is about..."
+                    required
+                    className="mt-1 min-h-[100px]"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="forum-icon" className="text-sm font-medium">
+                    Icon (emoji)
+                  </label>
+                  <Input
+                    id="forum-icon"
+                    value={newForumIcon}
+                    onChange={(e) => setNewForumIcon(e.target.value)}
+                    placeholder="📝"
+                    maxLength={2}
+                    className="mt-1"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    disabled={createForumMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createForumMutation.isPending}>
+                    {createForumMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create Forum
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search forums by name or description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {topics?.map((topic) => (
-          <Link key={topic.id} href={`/community/forums/${topic.id}`}>
-            <Card 
-              className="cursor-pointer hover:shadow-lg hover:border-primary/20 transition-all duration-300"
-              data-testid={`card-topic-${topic.id}`}
+        {filteredTopics.length > 0 ? (
+          filteredTopics.map((topic) => (
+            <Link key={topic.id} href={`/community/forums/${topic.id}`}>
+              <Card 
+                className="cursor-pointer hover:shadow-lg hover:border-primary/20 transition-all duration-300"
+                data-testid={`card-topic-${topic.id}`}
+              >
+                <CardContent className="pt-6">
+                  <div className="text-4xl mb-4">{getIconComponent(topic.icon)}</div>
+                  <h3 className="font-display text-xl font-bold mb-2" data-testid={`text-topic-name-${topic.id}`}>
+                    {topic.name}
+                  </h3>
+                  <p className="text-muted-foreground text-sm line-clamp-3 mb-4 min-h-[60px]" data-testid={`text-topic-description-${topic.id}`}>
+                    {topic.description}
+                  </p>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <MessageSquare className="h-4 w-4" />
+                    <span data-testid={`text-post-count-${topic.id}`}>{topic.postCount} posts</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))
+        ) : searchQuery.trim() ? (
+          <div className="col-span-full text-center py-20">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+              <Search className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">No forums found</h3>
+            <p className="text-muted-foreground mt-2">
+              No forums match your search "{searchQuery}". Try a different search term.
+            </p>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => setSearchQuery("")}
             >
-              <CardContent className="pt-6">
-                <div className="text-4xl mb-4">{getIconComponent(topic.icon)}</div>
-                <h3 className="font-display text-xl font-bold mb-2" data-testid={`text-topic-name-${topic.id}`}>
-                  {topic.name}
-                </h3>
-                <p className="text-muted-foreground text-sm line-clamp-3 mb-4 min-h-[60px]" data-testid={`text-topic-description-${topic.id}`}>
-                  {topic.description}
-                </p>
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <MessageSquare className="h-4 w-4" />
-                  <span data-testid={`text-post-count-${topic.id}`}>{topic.postCount} posts</span>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-
-        {topics?.length === 0 && (
+              Clear Search
+            </Button>
+          </div>
+        ) : (
           <div className="col-span-full text-center py-20">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
               <MessageSquare className="h-8 w-8 text-muted-foreground" />

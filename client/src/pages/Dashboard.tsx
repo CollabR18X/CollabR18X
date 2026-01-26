@@ -23,7 +23,7 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between">
         <div>
           <h1 className="font-display text-3xl md:text-4xl font-bold">
-            Welcome back, <span className="text-gradient">{user.firstName}</span>!
+            Welcome back, <span className="text-gradient">{user.displayName || user.firstName || "User"}</span>!
           </h1>
           <p className="text-muted-foreground mt-2">Here's what's happening with your collaborations.</p>
         </div>
@@ -60,16 +60,16 @@ export default function Dashboard() {
                   {user.profileImageUrl ? (
                     <img 
                       src={user.profileImageUrl} 
-                      alt={user.firstName || ""} 
-                      className="w-24 h-24 rounded-full object-cover border-4 border-primary/10"
+                      alt={user.displayName || user.firstName || "User"} 
+                      className="w-24 h-24 rounded-full object-cover border-4 border-primary/10 shadow-lg"
                     />
                   ) : (
-                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold border-4 border-primary/10">
-                      {user.firstName?.[0]}
+                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold border-4 border-primary/10 shadow-lg">
+                      {(user.displayName || user.firstName)?.[0] || "U"}
                     </div>
                   )}
                 </div>
-                <h3 className="font-bold text-xl">{user.firstName} {user.lastName}</h3>
+                <h3 className="font-bold text-xl">{user.displayName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "User"}</h3>
                 <p className="text-primary font-medium text-sm mt-1">{profile.niche || "No niche set"}</p>
                 <p className="text-muted-foreground text-sm mt-3 line-clamp-2">{profile.bio || "Add a bio to let others know about you!"}</p>
                 
@@ -86,6 +86,20 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="text-center py-6">
+                <div className="relative inline-block mb-4">
+                  {user.profileImageUrl ? (
+                    <img 
+                      src={user.profileImageUrl} 
+                      alt={user.displayName || user.firstName || "User"} 
+                      className="w-24 h-24 rounded-full object-cover border-4 border-primary/10 shadow-lg mx-auto"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold border-4 border-primary/10 shadow-lg mx-auto">
+                      {(user.displayName || user.firstName)?.[0] || "U"}
+                    </div>
+                  )}
+                </div>
+                <h3 className="font-bold text-xl mb-2">{user.displayName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "User"}</h3>
                 <p className="text-muted-foreground mb-4">You haven't set up your creator profile yet.</p>
                 <Link href="/profile/me">
                   <Button variant="secondary" className="w-full">Create Profile</Button>
