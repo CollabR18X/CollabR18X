@@ -42,6 +42,17 @@ jobs:
         run: npm run build
         env:
           VITE_BASE: /CollabR18X/
+      - name: Verify build output
+        run: |
+          echo "Checking build output..."
+          ls -la dist/public/ || echo "dist/public not found"
+          if [ -f dist/public/index.html ]; then
+            echo "index.html found, checking content:"
+            head -20 dist/public/index.html
+          else
+            echo "ERROR: index.html not found in dist/public"
+            exit 1
+          fi
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
