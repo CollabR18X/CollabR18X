@@ -41,7 +41,9 @@ jobs:
       - name: Build static site
         run: npm run build
         env:
-          VITE_BASE: /CollabR18X/
+          # For custom domain (collabr18x.com), change to: VITE_BASE: "/"
+          # For GitHub Pages project site, use: VITE_BASE: "/CollabR18X/"
+          VITE_BASE: "/"
       - name: Verify build output
         run: |
           echo "Checking build output..."

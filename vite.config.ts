@@ -19,9 +19,9 @@ export default defineConfig({
     runtimeErrorOverlay(),
     ...getReplitPlugins(),
   ],
-  // For GitHub Pages project site at https://github.com/CollabR18X/CollabR18X
-  // and https://collabr18x.github.io/CollabR18X/, assets must be served
-  // from the repository subpath.
+  // For GitHub Pages: use /CollabR18X/ for project site, / for custom domain
+  // If using custom domain (collabr18x.com), set VITE_BASE="/" in workflow
+  // For GitHub Pages project site, use VITE_BASE="/CollabR18X/"
   base: process.env.VITE_BASE ?? "/CollabR18X/",
   resolve: {
     alias: {
