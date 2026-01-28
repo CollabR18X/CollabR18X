@@ -65,12 +65,26 @@ app = FastAPI(
 )
 
 # CORS middleware
+# Allow requests from frontend domain and localhost for development
+allowed_origins = [
+    "https://collabr18x.com",
+    "https://www.collabr18x.com",
+    "https://collabr18x.github.io",
+    "https://collabr18x.github.io/CollabR18X",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+# In debug mode, allow all origins
+if settings.DEBUG:
+    allowed_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.DEBUG else [],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Session middleware (using cookies)
@@ -88,16 +102,22 @@ app.add_middleware(
 async def log_requests(request: Request, call_next):
     start_time = datetime.now()
     path = request.url.path
+    method = request.method
+    origin = request.headers.get("origin", "none")
     
     response = await call_next(request)
     
     duration = (datetime.now() - start_time).total_seconds() * 1000
     
     if path.startswith("/api"):
-        log(f"{request.method} {path} {response.status_code} in {duration:.0f}ms")
-        # Log 404 errors with more detail
+        log(f"{method} {path} {response.status_code} in {duration:.0f}ms (Origin: {origin})")
+        # Log errors with more detail
         if response.status_code == 404:
-            logger.warning(f"404 Not Found: {request.method} {path} - Route does not exist")
+            logger.warning(f"404 Not Found: {method} {path} - Route does not exist")
+        elif response.status_code == 405:
+            logger.error(f"405 Method Not Allowed: {method} {path} - Route exists but method not allowed")
+        elif response.status_code >= 500:
+            logger.error(f"{response.status_code} Server Error: {method} {path}")
     
     return response
 
@@ -149,16 +169,26 @@ if not settings.DEBUG:
         if os.path.exists(assets_dir):
             app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
         
-        # Serve SPA for all non-API routes
+        # Serve SPA for all non-API routes (only GET requests, registered last to not interfere with API)
+        # This must be registered AFTER all API routes to avoid conflicts
         @app.get("/{full_path:path}")
-        async def serve_spa(full_path: str):
-            """Serve SPA for all non-API routes"""
-            if full_path.startswith("api"):
-                return {"error": "Not found"}
+        async def serve_spa(full_path: str, request: Request):
+            """Serve SPA for all non-API GET routes"""
+            # Don't interfere with API routes - they should be handled by registered routers
+            # This route only handles GET requests, so POST/PUT/DELETE to /api/* won't reach here
+            if full_path.startswith("api/"):
+                # This shouldn't happen for API routes, but just in case
+                return JSONResponse(
+                    status_code=404,
+                    content={"error": "API route not found", "path": f"/{full_path}"}
+                )
             index_path = os.path.join(static_dir, "index.html")
             if os.path.exists(index_path):
                 return FileResponse(index_path)
-            return {"error": "Not found"}
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Not found", "path": f"/{full_path}"}
+            )
 
 
 if __name__ == "__main__":
