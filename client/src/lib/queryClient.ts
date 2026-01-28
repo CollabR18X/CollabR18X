@@ -1,5 +1,20 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Get API base URL from environment variable or use relative path
+const getApiBaseUrl = () => {
+  // In production build, Vite replaces import.meta.env.VITE_API_URL at build time
+  // For development, it uses the Vite proxy
+  // If VITE_API_URL is not set, use relative paths (works with same-origin or proxy)
+  return import.meta.env.VITE_API_URL || "";
+};
+
+export const getApiUrl = (path: string) => {
+  const baseUrl = getApiBaseUrl();
+  // Ensure path starts with /
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${normalizedPath}`;
+};
+
 async function throwIfResNotOk(res: Response, url?: string) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -18,14 +33,15 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const apiUrl = getApiUrl(url);
+  const res = await fetch(apiUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
-  await throwIfResNotOk(res, url);
+  await throwIfResNotOk(res, apiUrl);
   return res;
 }
 
@@ -35,7 +51,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const url = queryKey.join("/") as string;
+    const path = queryKey.join("/") as string;
+    const url = getApiUrl(path);
     const res = await fetch(url, {
       credentials: "include",
     });

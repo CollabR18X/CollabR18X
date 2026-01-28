@@ -46,6 +46,9 @@ jobs:
           # For custom domain (collabr18x.com), change to: VITE_BASE: "/"
           # For GitHub Pages project site, use: VITE_BASE: "/CollabR18X/"
           VITE_BASE: "/"
+          # Set your backend API URL here (e.g., https://your-backend.railway.app or https://api.collabr18x.com)
+          # Leave empty to use relative paths (requires backend on same domain or proxy)
+          VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
       - name: Verify build output
         run: |
           echo "=== Build Output Verification ==="

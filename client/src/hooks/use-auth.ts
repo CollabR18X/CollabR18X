@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import type { User } from "@shared/models/auth";
+import { getApiUrl } from "@/lib/queryClient";
 
 async function fetchUser(): Promise<User | null> {
   // Add timeout to prevent infinite loading
@@ -8,7 +9,7 @@ async function fetchUser(): Promise<User | null> {
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
   
   try {
-    const response = await fetch("/api/auth/user", {
+    const response = await fetch(getApiUrl("/api/auth/user"), {
       credentials: "include",
       signal: controller.signal,
     });
@@ -37,7 +38,7 @@ async function fetchUser(): Promise<User | null> {
 
 async function logout(): Promise<void> {
   // Call logout endpoint to clear session
-  await fetch("/api/auth/logout", {
+  await fetch(getApiUrl("/api/auth/logout"), {
     method: "GET",
     credentials: "include",
   });

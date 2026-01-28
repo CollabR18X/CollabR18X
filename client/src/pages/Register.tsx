@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react";
+import { getApiUrl } from "@/lib/queryClient";
 
 export default function Register() {
   const [, setLocation] = useLocation();
@@ -26,7 +27,7 @@ export default function Register() {
   const signupMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; first_name: string; last_name: string }) => {
       try {
-        const response = await fetch("/api/auth/register", {
+        const response = await fetch(getApiUrl("/api/auth/register"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),
