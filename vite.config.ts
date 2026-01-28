@@ -19,6 +19,10 @@ export default defineConfig({
     runtimeErrorOverlay(),
     ...getReplitPlugins(),
   ],
+  // For GitHub Pages project site at https://github.com/CollabR18X/CollabR18X
+  // and https://collabr18x.github.io/CollabR18X/, assets must be served
+  // from the repository subpath.
+  base: process.env.VITE_BASE ?? "/CollabR18X/",
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
