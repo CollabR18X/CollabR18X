@@ -71,11 +71,13 @@ jobs:
           fi
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      - name: Create .nojekyll file
+      - name: Create .nojekyll and 404.html for SPA routing
         run: |
           # Ensure .nojekyll exists to prevent Jekyll processing
           touch dist/public/.nojekyll
-          echo ".nojekyll file created"
+          # Create 404.html that redirects to index.html for client-side routing
+          cp dist/public/index.html dist/public/404.html
+          echo ".nojekyll and 404.html created for SPA routing"
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
