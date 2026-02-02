@@ -12,6 +12,5 @@ argon2-cffi==23.1.0
 python-multipart==0.0.12
 aiofiles==24.1.0
 httpx==0.27.2
-openid-client==0.1.0
 pydantic[email]==2.9.2
 starlette==0.41.0
