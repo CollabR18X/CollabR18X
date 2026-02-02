@@ -5,14 +5,28 @@ const getApiBaseUrl = () => {
   // In production build, Vite replaces import.meta.env.VITE_API_URL at build time
   // For development, it uses the Vite proxy
   // If VITE_API_URL is not set, use relative paths (works with same-origin or proxy)
-  return import.meta.env.VITE_API_URL || "";
+  const apiUrl = import.meta.env.VITE_API_URL || "";
+  
+  // Log API URL configuration in development
+  if (import.meta.env.DEV) {
+    console.log("API Base URL configured:", apiUrl || "(using relative paths - requires backend on same domain or proxy)");
+  }
+  
+  return apiUrl;
 };
 
 export const getApiUrl = (path: string) => {
   const baseUrl = getApiBaseUrl();
   // Ensure path starts with /
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${baseUrl}${normalizedPath}`;
+  const fullUrl = `${baseUrl}${normalizedPath}`;
+  
+  // Log in development for debugging
+  if (import.meta.env.DEV) {
+    console.log(`API Request: ${fullUrl}`);
+  }
+  
+  return fullUrl;
 };
 
 async function throwIfResNotOk(res: Response, url?: string) {

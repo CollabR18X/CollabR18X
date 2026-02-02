@@ -152,6 +152,12 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     )
 
 
+# Public health check (no auth) for Render / load balancers
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
+
 # Register all routes
 register_routes(app)
 

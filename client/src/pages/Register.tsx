@@ -26,30 +26,42 @@ export default function Register() {
 
   const signupMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; first_name: string; last_name: string }) => {
+      const apiUrl = getApiUrl("/api/auth/register");
+      console.log("Registration attempt - API URL:", apiUrl);
+      
       try {
-        const response = await fetch(getApiUrl("/api/auth/register"), {
+        const response = await fetch(apiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),
           credentials: "include",
         });
 
+        console.log("Registration response status:", response.status, response.statusText);
+
         if (!response.ok) {
           let errorMessage = "Registration failed";
           try {
             const errorData = await response.json();
+            console.error("Registration error data:", errorData);
             errorMessage = errorData.detail || errorData.message || `Registration failed: ${response.status} ${response.statusText}`;
-          } catch {
-            errorMessage = `Registration failed: ${response.status} ${response.statusText}`;
+          } catch (parseError) {
+            const text = await response.text().catch(() => "");
+            console.error("Registration error (non-JSON):", text);
+            errorMessage = `Registration failed: ${response.status} ${response.statusText}${text ? ` - ${text}` : ""}`;
           }
           throw new Error(errorMessage);
         }
 
-        return response.json();
+        const result = await response.json();
+        console.log("Registration successful:", result);
+        return result;
       } catch (error) {
+        console.error("Registration error:", error);
         // Handle network errors
         if (error instanceof TypeError && error.message.includes("fetch")) {
-          throw new Error("Failed to connect to server. Please check if the backend is running.");
+          const apiBase = import.meta.env.VITE_API_URL || "relative path";
+          throw new Error(`Failed to connect to backend API (${apiBase}). Please check if the backend is running and VITE_API_URL is configured correctly.`);
         }
         // Re-throw other errors
         throw error;

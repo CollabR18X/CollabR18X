@@ -3,6 +3,7 @@ Application configuration
 """
 import os
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import Optional
 
 
@@ -11,7 +12,15 @@ class Settings(BaseSettings):
     
     # Database - Use SQLite for local dev if PostgreSQL not available
     # For production, set DATABASE_URL to PostgreSQL connection string
+    # Render provides postgres://; SQLAlchemy expects postgresql://
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./collabr18x.db")
+    
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        if v and v.startswith("postgres://"):
+            return "postgresql://" + v[len("postgres://") :]
+        return v
     
     # Security
     SESSION_SECRET: str = os.getenv("SESSION_SECRET", "your-secret-key-change-this-in-production")

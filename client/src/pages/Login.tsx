@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react";
+import { getApiUrl } from "@/lib/queryClient";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -32,7 +33,7 @@ export default function Login() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(getApiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -72,7 +73,7 @@ export default function Login() {
   const signupMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; first_name: string; last_name: string }) => {
       try {
-        const response = await fetch("/api/auth/register", {
+        const response = await fetch(getApiUrl("/api/auth/register"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),

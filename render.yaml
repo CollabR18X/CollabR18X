@@ -1,0 +1,30 @@
+# CollabR18X backend on Render
+# Deploy: push to GitHub, then in Render Dashboard: New → Blueprint → connect repo
+# Or: New → Web Service → connect repo and use these settings
+
+databases:
+  - name: collabr18x-db
+    plan: free
+    region: oregon
+
+services:
+  - type: web
+    name: collabr18x-api
+    runtime: python
+    region: oregon
+    plan: free
+
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: collabr18x-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+
+    healthCheckPath: /api/health
