@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("NODE_ENV", "development") != "production"
     NODE_ENV: str = os.getenv("NODE_ENV", "development")
     PORT: int = int(os.getenv("PORT", "5000"))
+    # Extra CORS origins (comma-separated), e.g. https://collabr18x-web.onrender.com
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
     
     # Replit OIDC (optional for local dev)
     ISSUER_URL: Optional[str] = os.getenv("ISSUER_URL", "https://replit.com/oidc")

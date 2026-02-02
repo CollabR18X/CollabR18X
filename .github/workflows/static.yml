@@ -41,14 +41,17 @@ jobs:
           # Try npm ci first, fall back to npm install if lock file is out of sync
           npm ci || npm install
       - name: Build static site
-        run: npm run build
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "::warning::VITE_API_URL is not set. Registration/login will fail unless the frontend is on the same domain as the API. Set repo variable: Settings → Secrets and variables → Actions → Variables → VITE_API_URL = your backend URL (e.g. https://collabr18x-api.onrender.com)"
+          else
+            echo "VITE_API_URL is set (backend: $VITE_API_URL)"
+          fi
+          npm run build
         env:
-          # For custom domain (collabr18x.com), change to: VITE_BASE: "/"
-          # For GitHub Pages project site, use: VITE_BASE: "/CollabR18X/"
           VITE_BASE: "/"
-          # Set your backend API URL here (e.g., https://your-backend.railway.app or https://api.collabr18x.com)
-          # Leave empty to use relative paths (requires backend on same domain or proxy)
-          VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
+          # Required for registration/login when frontend is on GitHub Pages or Render static. Set in repo: Settings → Actions → Variables → VITE_API_URL
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
       - name: Verify build output
         run: |
           echo "=== Build Output Verification ==="

@@ -34,9 +34,10 @@ Use this guide to deploy the **FastAPI backend** (and optionally the **frontend 
 
 ---
 
-## 2. Point the frontend at the backend
+## 2. Point the frontend at the backend (required for registration/login)
 
-Your frontend must call this Render URL. Set **`VITE_API_URL`** at **build time** to the backend URL (no trailing slash).
+**Registration and login will fail with 404 or "endpoint not found" until the frontend is built with your backend URL.**  
+Your frontend must call this Render API URL. Set **`VITE_API_URL`** at **build time** to the backend URL (no trailing slash), e.g. `https://collabr18x-api.onrender.com`.
 
 ### If the frontend is built on GitHub Actions (e.g. for GitHub Pages)
 

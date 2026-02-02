@@ -71,9 +71,13 @@ allowed_origins = [
     "https://www.collabr18x.com",
     "https://collabr18x.github.io",
     "https://collabr18x.github.io/CollabR18X",
+    "https://collabr18x-web.onrender.com",  # Render static site
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+# Add any extra origins from env (comma-separated)
+if settings.CORS_ORIGINS:
+    allowed_origins.extend(o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip())
 # In debug mode, allow all origins
 if settings.DEBUG:
     allowed_origins = ["*"]

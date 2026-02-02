@@ -50,20 +50,29 @@ export default function Register() {
             console.error("Registration error (non-JSON):", text);
             errorMessage = `Registration failed: ${response.status} ${response.statusText}${text ? ` - ${text}` : ""}`;
           }
-          throw new Error(errorMessage);
+          const err = new Error(errorMessage) as Error & { status?: number; url?: string };
+          err.status = response.status;
+          err.url = apiUrl;
+          throw err;
         }
 
         const result = await response.json();
         console.log("Registration successful:", result);
         return result;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Registration error:", error);
-        // Handle network errors
-        if (error instanceof TypeError && error.message.includes("fetch")) {
-          const apiBase = import.meta.env.VITE_API_URL || "relative path";
-          throw new Error(`Failed to connect to backend API (${apiBase}). Please check if the backend is running and VITE_API_URL is configured correctly.`);
+        const err = error as Error & { status?: number; url?: string };
+        // Network or 404 usually means API URL not set or backend down
+        if (err instanceof TypeError && err.message?.includes("fetch")) {
+          throw new Error(
+            "Cannot reach the server. If this site is on GitHub Pages or Render, set VITE_API_URL to your backend URL when building (e.g. https://collabr18x-api.onrender.com)."
+          );
         }
-        // Re-throw other errors
+        if (err.status === 404 || err.url) {
+          throw new Error(
+            "Registration endpoint not found (404). Set VITE_API_URL to your backend URL in the build environment and rebuild the frontend."
+          );
+        }
         throw error;
       }
     },
