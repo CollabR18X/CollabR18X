@@ -1,6 +1,8 @@
-# Deploy CollabR18X backend on Render
+# Deploy CollabR18X on Render
 
-Use this guide to deploy the **FastAPI backend** on [Render](https://render.com) so your frontend (e.g. GitHub Pages) can call the API for login and registration.
+Use this guide to deploy the **FastAPI backend** (and optionally the **frontend static site**) on [Render](https://render.com).
+
+**If you see "Publish directory dist/public does not exist!"** – the Static Site build didn’t create that folder. Set **Build command** to `npm install && npm run build` and **Publish directory** to `dist/public` in the Render Static Site settings.
 
 ---
 
@@ -102,7 +104,21 @@ If you prefer not to use `render.yaml`:
 
 ---
 
-## 5. Free tier notes
+## 5. Static site: "Publish directory dist/public does not exist"
+
+If your **Render Static Site** fails with that message, the build didn’t create `dist/public`. Fix it in the dashboard:
+
+1. Open your **Static Site** service on Render.
+2. **Settings** → **Build & Deploy**.
+3. Set **Build command** to: `npm install && npm run build`
+4. Set **Publish directory** to: `dist/public`
+5. Save and trigger a **Manual Deploy**.
+
+The `render.yaml` Blueprint now includes an optional static site (`collabr18x-web`) with these values, so new Blueprint deploys will work. For an existing static site, update the settings above.
+
+---
+
+## 6. Free tier notes
 
 - **Free Web Service** spins down after ~15 minutes of no traffic; the first request after that can take 30–60 seconds (cold start).
 - **Free PostgreSQL** is sufficient for development/small usage; upgrade if you need more.
