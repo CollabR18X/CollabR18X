@@ -114,7 +114,21 @@ If you prefer not to use `render.yaml`:
 
 ---
 
-## 6. Static site: "Publish directory dist/public does not exist"
+## 6. Static site: blank page at https://collabr18x.onrender.com/ (or collabr18x-web)
+
+If the static site loads but shows a **blank white page**, the build probably used the wrong **base path**. The app then requests `/CollabR18X/assets/...` but the site is served at `/`, so those assets 404 and no JS runs.
+
+**Fix:** In Render Dashboard → your **Static Site** service → **Environment**:
+- Add or set **VITE_BASE** = **/** (forward slash only).
+- Save and trigger a **Manual Deploy**.
+
+After redeploy, the app will be built with `base: "/"` and assets will load from `/assets/...`, so the page should render.
+
+**SPA routing:** For paths like `/login` or `/register` to work when opened directly (or refreshed), the static site must serve `index.html` for all paths. In Render: Static Site → **Settings** → **Redirects / Rewrites** → add a rewrite so `/*` serves `/index.html` (or use the “Single Page Application” option if available).
+
+---
+
+## 7. Static site: "Publish directory dist/public does not exist"
 
 If your **Render Static Site** fails with that message, the build either didn’t run or failed before creating `dist/public`.
 
@@ -131,7 +145,7 @@ If your **Render Static Site** fails with that message, the build either didn’
 
 ---
 
-## 7. Free tier notes
+## 8. Free tier notes
 
 - **Free Web Service** spins down after ~15 minutes of no traffic; the first request after that can take 30–60 seconds (cold start).
 - **Free PostgreSQL** is sufficient for development/small usage; upgrade if you need more.

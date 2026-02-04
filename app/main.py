@@ -220,8 +220,13 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 # Public health check (no auth) for Render / load balancers
 @app.get("/api/health")
-async def health():
-    return {"status": "ok"}
+async def health(request: Request):
+    origin = (request.headers.get("origin") or "").strip().rstrip("/")
+    headers = {}
+    if origin and _origin_allowed(origin):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(content={"status": "ok"}, headers=headers)
 
 
 # Explicit OPTIONS handler so CORS preflight always gets 200 with headers

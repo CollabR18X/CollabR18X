@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     PORT: int = int(os.getenv("PORT", "5000"))
     # Extra CORS origins (comma-separated), e.g. https://collabr18x-web.onrender.com
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
-    # Redirect these hosts to canonical URL (comma-separated), e.g. collabr18x.onrender.com
-    REDIRECT_HOSTS: str = os.getenv("REDIRECT_HOSTS", "collabr18x.onrender.com")
+    # Redirect these hosts to canonical URL (comma-separated). Canonical host is collabr18x.com
+    REDIRECT_HOSTS: str = os.getenv("REDIRECT_HOSTS", "collabr18x.onrender.com,collabr18x-web.onrender.com")
     CANONICAL_URL: str = os.getenv("CANONICAL_URL", "https://collabr18x.com")
     
     # Replit OIDC (optional for local dev)

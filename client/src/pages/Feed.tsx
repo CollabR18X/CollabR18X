@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { sitePath } from "@/lib/site";
 import { 
   Heart, 
   MessageCircle, 
@@ -215,7 +216,7 @@ export default function Feed() {
   };
 
   const handleShare = async (post: FeedPost, platform?: string) => {
-    const postUrl = `${window.location.origin}/community/forums/posts/${post.id}`;
+    const postUrl = sitePath(`/community/forums/posts/${post.id}`);
     const text = `Check out this post: ${post.title}`;
     
     if (platform) {

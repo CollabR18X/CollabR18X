@@ -58,7 +58,7 @@ export default function Login() {
         const error = err as Error;
         if (error instanceof TypeError || error.message?.includes("fetch") || error.message === "Failed to fetch") {
           throw new Error(
-            "Cannot reach the server. Set VITE_API_URL to your backend URL when building (e.g. https://collabr18x-api.onrender.com), or the backend may be down (Render free tier spins down after ~15 min)."
+            "Cannot reach the server. If you use Render free tier, the backend sleeps after ~15 min—wait 30–60 seconds and try again, or open your API URL in a new tab to wake it. Otherwise check VITE_API_URL is set when building."
           );
         }
         throw err;
@@ -101,7 +101,7 @@ export default function Login() {
         const err = error as Error;
         if (err instanceof TypeError || err.message?.includes("fetch") || err.message === "Failed to fetch") {
           throw new Error(
-            "Cannot reach the server. Set VITE_API_URL when building, or the backend may be down (Render free tier spins down after ~15 min)."
+            "Cannot reach the server. If you use Render free tier, wait 30–60 seconds and try again, or open your API URL in a new tab to wake the backend."
           );
         }
         throw error;

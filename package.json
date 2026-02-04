@@ -2,7 +2,7 @@
   "name": "rest-express",
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://CollabR18X.github.io/CollabR18X",
+  "homepage": "https://collabr18x.com",
   "license": "MIT",
   "scripts": {
     "dev": "vite",

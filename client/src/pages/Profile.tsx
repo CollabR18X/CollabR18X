@@ -14,6 +14,7 @@ import { Link, useRoute, useLocation } from "wouter";
 import { ArrowLeft, MapPin, Globe, Instagram, Twitter, Youtube, ExternalLink, ShieldBan, Loader2, Briefcase, GraduationCap, Ruler, Calendar, Shield, Lock, AlertTriangle, CheckCircle, Heart, Star, Music2, PlayCircle, MessageCircle, Image as ImageIcon, CreditCard, Share2, Copy, Check, Mail, Linkedin, Pencil, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
+import { sitePath } from "@/lib/site";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -110,11 +111,11 @@ export default function Profile() {
   });
   const userPostsCount = userPosts?.length || 0;
   
-  // Get profile URL for sharing
+  // Get profile URL for sharing (canonical host collabr18x.com)
   const profileUrl = isMeRoute 
-    ? `${window.location.origin}/profile/me`
+    ? sitePath("/profile/me")
     : id 
-    ? `${window.location.origin}/profile/${id}`
+    ? sitePath(`/profile/${id}`)
     : "";
 
   // Update display name mutation
