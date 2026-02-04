@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from starlette.responses import Response
 from contextlib import asynccontextmanager
 import uvicorn
 from datetime import datetime
@@ -64,34 +65,25 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
-# Allow requests from frontend domain and localhost for development
+# CORS: allow requests from frontend domain and localhost
 allowed_origins = [
     "https://collabr18x.com",
     "https://www.collabr18x.com",
     "https://collabr18x.github.io",
     "https://collabr18x.github.io/CollabR18X",
-    "https://collabr18x-web.onrender.com",  # Render static site
+    "https://collabr18x-web.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
-# Add any extra origins from env (comma-separated)
 if settings.CORS_ORIGINS:
     allowed_origins.extend(o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip())
-# In debug mode, allow all origins
-if settings.DEBUG:
-    allowed_origins = ["*"]
+# Never use "*" with credentials (browser rejects it); keep explicit list
+if settings.DEBUG and not allowed_origins:
+    allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
+_allowed_origins_set = frozenset(o.rstrip("/") for o in allowed_origins)
 
-# Session middleware (using cookies)
+# Session middleware
 from starlette.middleware.sessions import SessionMiddleware
 app.add_middleware(
     SessionMiddleware,
@@ -99,6 +91,53 @@ app.add_middleware(
     max_age=365 * 24 * 60 * 60,  # 365 days (1 year) - users stay logged in until they log out
     same_site="lax"
 )
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(allowed_origins),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+
+def _origin_allowed(origin: str) -> bool:
+    if not origin:
+        return False
+    o = origin.strip().rstrip("/")
+    if o in _allowed_origins_set:
+        return True
+    # Allow collabr18x.com and subdomains (e.g. www)
+    if "collabr18x.com" in o and (o.startswith("https://") or o.startswith("http://")):
+        return True
+    return False
+
+
+# CORS: run first (add last) so OPTIONS preflight gets 200 with headers before anything else
+@app.middleware("http")
+async def cors_headers_middleware(request: Request, call_next):
+    origin = (request.headers.get("origin") or "").strip().rstrip("/")
+    if request.method == "OPTIONS" and request.url.path.startswith("/api"):
+        # Preflight: always return 200 with CORS headers so browser allows the actual request
+        if origin and _origin_allowed(origin):
+            return Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Max-Age": "86400",
+                },
+            )
+        logger.warning(f"CORS preflight: origin missing or not allowed: {origin!r}")
+    response = await call_next(request)
+    if origin and _origin_allowed(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 
 # Redirect Render URL (and other alternate hosts) to canonical domain
@@ -150,7 +189,12 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handle HTTP exceptions with detailed information"""
     path = request.url.path
     method = request.method
-    
+    origin = (request.headers.get("origin") or "").strip().rstrip("/")
+    headers = {}
+    if origin and _origin_allowed(origin):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
     # Only handle API routes here (frontend routes are handled by SPA)
     if path.startswith("/api") and exc.status_code == 404:
         logger.error(f"404 Error - Route not found: {method} {path}")
@@ -162,13 +206,15 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
                 "path": path,
                 "method": method,
                 "available_routes": "Check /docs for available API endpoints"
-            }
+            },
+            headers=headers,
         )
-    
+
     # For other HTTP exceptions, return standard response
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": exc.detail, "path": path, "status_code": exc.status_code}
+        content={"error": exc.detail, "path": path, "status_code": exc.status_code},
+        headers=headers,
     )
 
 
@@ -176,6 +222,24 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+# Explicit OPTIONS handler so CORS preflight always gets 200 with headers
+@app.options("/api/{path:path}")
+async def options_api(request: Request, path: str):
+    origin = (request.headers.get("origin") or "").strip().rstrip("/")
+    if not origin or not _origin_allowed(origin):
+        return Response(status_code=200)  # no CORS headers = preflight fails for disallowed origins
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "86400",
+        },
+    )
 
 
 # Register all routes
