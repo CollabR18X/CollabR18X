@@ -64,7 +64,16 @@ VITE_API_URL=https://collabr18x-api.onrender.com npm run build
 
 ---
 
-## 3. CORS (already set in code)
+## 3. Redirect Render URL to custom domain
+
+Visits to **https://collabr18x.onrender.com/** (and other hosts in `REDIRECT_HOSTS`) are redirected to **https://collabr18x.com/** with the same path (301). API paths (`/api/*`) are not redirected so the frontend can still call the backend at the Render URL. Configure via env vars on the API service:
+
+- **REDIRECT_HOSTS** – comma-separated hosts to redirect (default: `collabr18x.onrender.com`)
+- **CANONICAL_URL** – target URL (default: `https://collabr18x.com`)
+
+---
+
+## 4. CORS (already set in code)
 
 The backend in `app/main.py` already allows:
 
@@ -78,7 +87,7 @@ If you use a different frontend origin (e.g. another Render static site or custo
 
 ---
 
-## 4. Manual setup (without Blueprint)
+## 5. Manual setup (without Blueprint)
 
 If you prefer not to use `render.yaml`:
 
@@ -105,21 +114,24 @@ If you prefer not to use `render.yaml`:
 
 ---
 
-## 5. Static site: "Publish directory dist/public does not exist"
+## 6. Static site: "Publish directory dist/public does not exist"
 
-If your **Render Static Site** fails with that message, the build didn’t create `dist/public`. Fix it in the dashboard:
+If your **Render Static Site** fails with that message, the build either didn’t run or failed before creating `dist/public`.
+
+**Fix in the dashboard:**
 
 1. Open your **Static Site** service on Render.
 2. **Settings** → **Build & Deploy**.
-3. Set **Build command** to: `npm install && npm run build`
-4. Set **Publish directory** to: `dist/public`
-5. Save and trigger a **Manual Deploy**.
+3. **Build command:** `npm install && npm run build` (exactly this).
+4. **Publish directory:** `dist/public`
+5. **Root directory:** leave blank (build must run from repo root).
+6. Save and trigger a **Manual Deploy**.
 
-The `render.yaml` Blueprint now includes an optional static site (`collabr18x-web`) with these values, so new Blueprint deploys will work. For an existing static site, update the settings above.
+**If it still fails:** Open the **Logs** for the failed deploy and scroll up. The "Publish directory does not exist" line appears *after* the build. Look for errors *during* the build step (e.g. `npm install` or `vite build` failing). Fix those first (e.g. Node version — the repo has a `.nvmrc` for Node 20).
 
 ---
 
-## 6. Free tier notes
+## 7. Free tier notes
 
 - **Free Web Service** spins down after ~15 minutes of no traffic; the first request after that can take 30–60 seconds (cold start).
 - **Free PostgreSQL** is sufficient for development/small usage; upgrade if you need more.

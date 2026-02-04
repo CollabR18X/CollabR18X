@@ -5,7 +5,7 @@ import os
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from contextlib import asynccontextmanager
 import uvicorn
 from datetime import datetime
@@ -99,6 +99,22 @@ app.add_middleware(
     max_age=365 * 24 * 60 * 60,  # 365 days (1 year) - users stay logged in until they log out
     same_site="lax"
 )
+
+
+# Redirect Render URL (and other alternate hosts) to canonical domain
+_redirect_hosts = [h.strip().lower() for h in settings.REDIRECT_HOSTS.split(",") if h.strip()]
+_canonical_url = settings.CANONICAL_URL.rstrip("/")
+
+@app.middleware("http")
+async def redirect_to_canonical(request: Request, call_next):
+    """Redirect requests from alternate hosts (e.g. collabr18x.onrender.com) to canonical URL."""
+    host = (request.headers.get("host") or "").split(":")[0].lower()
+    path = request.url.path
+    if _canonical_url and host in _redirect_hosts and not path.startswith("/api"):
+        # Preserve path and query string
+        url = f"{_canonical_url}{path}" + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(url=url, status_code=301)
+    return await call_next(request)
 
 
 # Request logging middleware

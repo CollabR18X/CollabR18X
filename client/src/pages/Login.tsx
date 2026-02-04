@@ -4,10 +4,11 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react";
-import { getApiUrl } from "@/lib/queryClient";
+import { getApiUrl, isApiUrlConfigured } from "@/lib/queryClient";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -33,25 +34,35 @@ export default function Login() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
-      const response = await fetch(getApiUrl("/api/auth/login"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
+      try {
+        const response = await fetch(getApiUrl("/api/auth/login"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+          credentials: "include",
+        });
 
-      if (!response.ok) {
-        let errorMessage = "Login failed";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.detail || errorData.message || `Login failed: ${response.status} ${response.statusText}`;
-        } catch {
-          errorMessage = `Login failed: ${response.status} ${response.statusText}`;
+        if (!response.ok) {
+          let errorMessage = "Login failed";
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.detail || errorData.message || `Login failed: ${response.status} ${response.statusText}`;
+          } catch {
+            errorMessage = `Login failed: ${response.status} ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
-        throw new Error(errorMessage);
-      }
 
-      return response.json();
+        return response.json();
+      } catch (err) {
+        const error = err as Error;
+        if (error instanceof TypeError || error.message?.includes("fetch") || error.message === "Failed to fetch") {
+          throw new Error(
+            "Cannot reach the server. Set VITE_API_URL to your backend URL when building (e.g. https://collabr18x-api.onrender.com), or the backend may be down (Render free tier spins down after ~15 min)."
+          );
+        }
+        throw err;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -87,8 +98,11 @@ export default function Login() {
 
         return response.json();
       } catch (error) {
-        if (error instanceof TypeError && error.message.includes("fetch")) {
-          throw new Error("Failed to connect to server. Please check if the backend is running.");
+        const err = error as Error;
+        if (err instanceof TypeError || err.message?.includes("fetch") || err.message === "Failed to fetch") {
+          throw new Error(
+            "Cannot reach the server. Set VITE_API_URL when building, or the backend may be down (Render free tier spins down after ~15 min)."
+          );
         }
         throw error;
       }
@@ -163,6 +177,14 @@ export default function Login() {
           </div>
         </CardHeader>
         <CardContent>
+          {!isApiUrlConfigured() && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Login will not work</AlertTitle>
+              <AlertDescription>
+                This site was built without the backend API URL. Set <strong>VITE_API_URL</strong> to your API URL when building, then rebuild and redeploy.
+              </AlertDescription>
+            </Alert>
+          )}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "signup")} defaultValue="login">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>

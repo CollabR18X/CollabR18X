@@ -15,6 +15,12 @@ const getApiBaseUrl = () => {
   return apiUrl;
 };
 
+/** True if requests will hit a real API (backend URL set, or dev proxy). Used to show "set VITE_API_URL" warning. */
+export const isApiUrlConfigured = (): boolean => {
+  if (import.meta.env.DEV) return true; // dev uses proxy
+  return !!(import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim());
+};
+
 export const getApiUrl = (path: string) => {
   const baseUrl = getApiBaseUrl();
   // Ensure path starts with /

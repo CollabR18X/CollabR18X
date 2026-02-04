@@ -4,9 +4,10 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react";
-import { getApiUrl } from "@/lib/queryClient";
+import { getApiUrl, isApiUrlConfigured } from "@/lib/queryClient";
 
 export default function Register() {
   const [, setLocation] = useLocation();
@@ -68,9 +69,9 @@ export default function Register() {
             "Cannot reach the server. If this site is on GitHub Pages or Render, set VITE_API_URL to your backend URL when building (e.g. https://collabr18x-api.onrender.com)."
           );
         }
-        if (err.status === 404 || err.url) {
+        if (err.status === 404 || err.status === 405) {
           throw new Error(
-            "Registration endpoint not found (404). Set VITE_API_URL to your backend URL in the build environment and rebuild the frontend."
+            "Registration can't reach the API (404/405). This usually means the site was built without the backend URL. Set VITE_API_URL to your API URL (e.g. https://collabr18x-api.onrender.com) when building, then rebuild and redeploy."
           );
         }
         throw error;
@@ -143,6 +144,16 @@ export default function Register() {
           </div>
         </CardHeader>
         <CardContent>
+          {!isApiUrlConfigured() && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Registration will not work</AlertTitle>
+              <AlertDescription>
+                This site was built without the backend API URL. Set <strong>VITE_API_URL</strong> to your API URL (e.g.{" "}
+                <code className="text-xs">https://collabr18x-api.onrender.com</code>) when building the frontend, then
+                rebuild and redeploy. GitHub: Settings → Secrets and variables → Actions → Variables.
+              </AlertDescription>
+            </Alert>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
