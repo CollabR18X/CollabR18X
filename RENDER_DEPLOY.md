@@ -149,6 +149,42 @@ If your **Render Static Site** fails with that message, the build either didn’
 
 - **Free Web Service** spins down after ~15 minutes of no traffic; the first request after that can take 30–60 seconds (cold start).
 - **Free PostgreSQL** is sufficient for development/small usage; upgrade if you need more.
+- **Profile data** (bio, preferences, etc.) is stored in PostgreSQL and **persists across deploys**.
+- **Profile pictures** are stored on disk by default and are **lost on redeploy**. See section 9.
+
+---
+
+## 9. Profile pictures persist across deploys (S3 / Cloudflare R2)
+
+By default, uploaded profile pictures are stored on local disk and are **lost when the service redeploys**. To persist them, use S3-compatible storage.
+
+### Option A: Cloudflare R2 (recommended, free tier)
+
+1. **Create R2 bucket**: [Cloudflare Dashboard](https://dash.cloudflare.com) → R2 → Create bucket (e.g. `collabr18x-uploads`).
+2. **Enable public access**: Bucket → Settings → Public access → Allow access. Note the public URL (e.g. `https://pub-xxxxx.r2.dev`) or add a custom domain.
+3. **Configure CORS**: Bucket → Settings → CORS policy — add a rule allowing your origin (e.g. `https://collabr18x.com`) with methods `GET, PUT, HEAD` and exposed headers `ETag`.
+4. **Create API token**: R2 → Manage R2 API Tokens → Create API token. Copy Access Key ID and Secret Access Key.
+5. **S3 endpoint**: R2 → bucket → S3 API endpoint (e.g. `https://<account_id>.r2.cloudflarestorage.com`).
+6. **Add env vars** in Render Dashboard → collabr18x service → Environment:
+   - `AWS_ACCESS_KEY_ID` = (from API token)
+   - `AWS_SECRET_ACCESS_KEY` = (from API token)
+   - `AWS_REGION` = `auto`
+   - `S3_BUCKET` = `collabr18x-uploads`
+   - `S3_ENDPOINT_URL` = `https://<account_id>.r2.cloudflarestorage.com`
+   - `S3_PUBLIC_URL` = `https://pub-xxxxx.r2.dev` (or your custom domain)
+
+### Option B: AWS S3
+
+1. Create S3 bucket, enable public read for uploads (or use CloudFront).
+2. Create IAM user with `s3:PutObject` permission.
+3. Add env vars: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET`.
+4. If using a custom domain for public access, set `S3_PUBLIC_URL`.
+
+### Option C: Render Persistent Disk (paid plan only)
+
+Free plan does not support disks. If you upgrade to a paid service:
+- Add a disk (e.g. mount path `/data`).
+- Set `UPLOAD_DIR` = `/data/uploads`.
 
 ---
 
@@ -158,5 +194,6 @@ If your **Render Static Site** fails with that message, the build either didn’
 - [ ] `VITE_API_URL` set to `https://<your-service>.onrender.com` and used in the frontend build.
 - [ ] Frontend rebuilt and redeployed (e.g. GitHub Actions) after setting `VITE_API_URL`.
 - [ ] CORS in `app/main.py` includes your frontend origin(s).
+- [ ] (Optional) S3/R2 configured if you want profile pictures to persist across deploys.
 
-After that, login and registration from the site should hit the Render API and work.
+Profile data (bio, preferences) is stored in PostgreSQL and persists. Profile pictures require S3/R2 to persist on the free plan.

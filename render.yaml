@@ -29,5 +29,8 @@ services:
         generateValue: true
       - key: NODE_ENV
         value: production
+      # Optional: S3/R2 for profile pics (persists across deploys). Add in Render Dashboard:
+      # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET
+      # For R2: S3_ENDPOINT_URL, S3_PUBLIC_URL (R2 public bucket URL)
 
     healthCheckPath: /api/health

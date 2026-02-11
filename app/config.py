@@ -35,7 +35,16 @@ class Settings(BaseSettings):
     REDIRECT_HOSTS: str = os.getenv("REDIRECT_HOSTS", "collabr18x.onrender.com,collabr18x-web.onrender.com")
     CANONICAL_URL: str = os.getenv("CANONICAL_URL", "https://collabr18x.com")
 
-    # Uploads - local disk storage (use persistent volume on Render for production)
+    # Uploads - S3-compatible storage (recommended for production; persists across deploys)
+    # Set these to use AWS S3 or Cloudflare R2. Leave unset for local disk (lost on deploy).
+    AWS_ACCESS_KEY_ID: Optional[str] = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY: Optional[str] = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_REGION: Optional[str] = os.getenv("AWS_REGION", "auto")  # "auto" for Cloudflare R2
+    S3_BUCKET: Optional[str] = os.getenv("S3_BUCKET")
+    S3_ENDPOINT_URL: Optional[str] = os.getenv("S3_ENDPOINT_URL")  # For R2: https://<account_id>.r2.cloudflarestorage.com
+    S3_PUBLIC_URL: Optional[str] = os.getenv("S3_PUBLIC_URL")  # Public URL base for uploaded files (e.g. R2 public bucket URL)
+
+    # Fallback: local disk (ephemeral on Render free plan)
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
     
     # Replit OIDC (optional for local dev)
