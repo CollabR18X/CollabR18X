@@ -2,6 +2,7 @@
 Authentication routes
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from app.limiter import limiter
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -9,6 +10,7 @@ from app.models.auth import User
 from app.services.auth_service import create_user, authenticate_user
 from app.services.profile_service import create_profile
 from app.middleware.auth import get_current_user, create_session, delete_session
+from app.config import settings
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from passlib.context import CryptContext
@@ -38,8 +40,10 @@ class ChangePasswordRequest(BaseModel):
 
 
 @router.post("/auth/register")
+@limiter.limit("5/minute")
 async def register(
-    request: RegisterRequest,
+    request: Request,
+    body: RegisterRequest,
     response: Response,
     db: Session = Depends(get_db)
 ):
@@ -49,26 +53,26 @@ async def register(
     
     try:
         # Check if user exists
-        existing_user = db.query(User).filter(User.email == request.email).first()
+        existing_user = db.query(User).filter(User.email == body.email).first()
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already registered")
         
         # Validate password (check bytes, not characters)
-        password_bytes = len(request.password.encode('utf-8'))
+        password_bytes = len(body.password.encode('utf-8'))
         if password_bytes < 8 or password_bytes > 100:
             raise HTTPException(status_code=400, detail="Password must be between 8 and 100 bytes")
         
         # Hash password with Argon2 (no 72-byte limit, more secure than bcrypt)
-        hashed_password = pwd_context.hash(request.password)
+        hashed_password = pwd_context.hash(body.password)
         
         # Create user
         try:
             user = create_user(
                 db=db,
-                email=request.email,
+                email=body.email,
                 password=hashed_password,
-                first_name=request.first_name,
-                last_name=request.last_name
+                first_name=body.first_name,
+                last_name=body.last_name
             )
         except ValueError as ve:
             # Handle validation errors from create_user
@@ -103,8 +107,9 @@ async def register(
             key="session_id",
             value=session_id,
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
+            secure=settings.SECURE_COOKIES,
             samesite="lax",
+            path="/",
             max_age=365 * 24 * 60 * 60  # 365 days (1 year) - persistent login
         )
         
@@ -130,12 +135,17 @@ async def register(
         # Return a more user-friendly error message
         if "UNIQUE constraint" in error_msg or "duplicate" in error_msg.lower():
             raise HTTPException(status_code=400, detail="Email already registered")
-        raise HTTPException(status_code=500, detail=f"Registration failed: {error_msg}")
+        raise HTTPException(
+            status_code=500,
+            detail="Registration failed. Please try again later." if not settings.DEBUG else f"Registration failed: {error_msg}"
+        )
 
 
 @router.post("/auth/login")
+@limiter.limit("10/minute")
 async def login(
-    request: LoginRequest,
+    request: Request,
+    body: LoginRequest,
     response: Response,
     db: Session = Depends(get_db)
 ):
@@ -145,11 +155,11 @@ async def login(
     logger = logging.getLogger(__name__)
     
     try:
-        logger.info(f"Login attempt for email: {request.email}")
+        logger.info(f"Login attempt for email: {body.email}")
         
         # Try to authenticate user
         try:
-            user = authenticate_user(db, request.email, request.password)
+            user = authenticate_user(db, body.email, body.password)
         except (OperationalError, SQLAlchemyError) as db_error:
             logger.error(f"Database error during login: {str(db_error)}")
             raise HTTPException(
@@ -162,11 +172,11 @@ async def login(
             logger.error(traceback.format_exc())
             raise HTTPException(
                 status_code=500,
-                detail=f"Authentication error: {str(auth_error)}"
+                detail="Authentication error. Please try again." if not settings.DEBUG else f"Authentication error: {str(auth_error)}"
             )
         
         if not user:
-            logger.warning(f"Authentication failed for email: {request.email}")
+            logger.warning(f"Authentication failed for email: {body.email}")
             raise HTTPException(status_code=401, detail="Invalid email or password")
         
         # Ensure user.id is a string
@@ -190,8 +200,9 @@ async def login(
             key="session_id",
             value=session_id,
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
+            secure=settings.SECURE_COOKIES,
             samesite="lax",
+            path="/",
             max_age=365 * 24 * 60 * 60  # 365 days (1 year) - persistent login
         )
         
@@ -218,7 +229,10 @@ async def login(
             raise HTTPException(status_code=503, detail="Database connection failed. Please check if the database is running.")
         if "session" in error_msg.lower():
             raise HTTPException(status_code=500, detail="Failed to create login session. Please try again.")
-        raise HTTPException(status_code=500, detail=f"Login failed: {error_msg}")
+        raise HTTPException(
+            status_code=500,
+            detail="Login failed. Please try again later." if not settings.DEBUG else f"Login failed: {error_msg}"
+        )
 
 
 @router.get("/auth/user")
@@ -247,8 +261,13 @@ async def logout(
     if session_id:
         delete_session(db, session_id)
     
-    # Clear session cookie
-    response.delete_cookie(key="session_id")
+    # Clear session cookie (path must match how it was set)
+    response.delete_cookie(
+        key="session_id",
+        path="/",
+        samesite="lax",
+        secure=settings.SECURE_COOKIES,
+    )
     
     return {"message": "Logged out successfully"}
 
@@ -298,4 +317,7 @@ async def change_password(
         import traceback
         logger.error(traceback.format_exc())
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to change password")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to change password. Please try again later." if not settings.DEBUG else f"Failed to change password: {str(e)}"
+        )
