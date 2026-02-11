@@ -14,9 +14,9 @@ services:
     region: oregon
     plan: free
 
-    # Build: install Node deps, build frontend into dist/public, then install Python deps
+    # Build: install Node deps (include dev for vite), build frontend, then install Python deps
     buildCommand: |
-      npm install && VITE_BASE=/ npm run build && pip install -r requirements.txt
+      npm install --include=dev && VITE_BASE=/ npm run build && pip install -r requirements.txt
 
     startCommand: python run.py
 
