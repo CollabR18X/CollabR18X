@@ -9,12 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle, Camera, X, Plus, Eye, EyeOff, Shield, Lock, MessageCircle, Image as ImageIcon, PlayCircle, Heart, CreditCard, Linkedin, Mail } from "lucide-react";
+import { Loader2, Save, Link as LinkIcon, MapPin, Instagram, Twitter, Youtube, Music2, Check, AlertTriangle, Camera, X, Plus, Eye, EyeOff, Shield, Lock, MessageCircle, Image as ImageIcon, PlayCircle, Heart, CreditCard, Linkedin, Mail, SlidersHorizontal } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Slider } from "@/components/ui/slider";
 
 export default function MyProfile() {
   const { user } = useAuth();
@@ -85,6 +86,9 @@ export default function MyProfile() {
         dealBreakers: [],
         safetyRequirements: [],
       },
+      minAgePreference: 18,
+      maxAgePreference: 99,
+      maxDistance: 100,
     },
   });
 
@@ -125,6 +129,9 @@ export default function MyProfile() {
           showEducation: true,
           showHeight: true,
         },
+        minAgePreference: profile.minAgePreference ?? 18,
+        maxAgePreference: profile.maxAgePreference ?? 99,
+        maxDistance: profile.maxDistance ?? 100,
       });
       setPhotos(profile.photos || []);
       const loadedBoundaries = {
@@ -277,6 +284,9 @@ export default function MyProfile() {
     if (rest.displayName !== undefined && rest.displayName !== (profile?.user?.displayName || "")) updatePayload.displayName = rest.displayName;
     if (rest.bio !== undefined && rest.bio !== (profile?.bio || "")) updatePayload.bio = rest.bio;
     if (rest.niche !== undefined && rest.niche !== (profile?.niche || "")) updatePayload.niche = rest.niche;
+    if (rest.minAgePreference !== undefined && rest.minAgePreference !== (profile?.minAgePreference ?? 18)) updatePayload.minAgePreference = rest.minAgePreference;
+    if (rest.maxAgePreference !== undefined && rest.maxAgePreference !== (profile?.maxAgePreference ?? 99)) updatePayload.maxAgePreference = rest.maxAgePreference;
+    if (rest.maxDistance !== undefined && rest.maxDistance !== (profile?.maxDistance ?? 100)) updatePayload.maxDistance = rest.maxDistance;
     if (rest.portfolioUrl !== undefined && rest.portfolioUrl !== (profile?.portfolioUrl || "")) updatePayload.portfolioUrl = rest.portfolioUrl;
     if (rest.location !== undefined && rest.location !== (profile?.location || "")) updatePayload.location = rest.location;
     if (rest.isNsfw !== undefined && rest.isNsfw !== profile?.isNsfw) updatePayload.isNsfw = rest.isNsfw;
@@ -682,6 +692,88 @@ export default function MyProfile() {
                       </FormControl>
                     </FormItem>
                   )} />
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                  Preferences
+                </h3>
+                <p className="text-sm text-muted-foreground">Age range and distance preferences for discovery.</p>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="minAgePreference"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Min Age</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={18}
+                              max={99}
+                              {...field}
+                              value={field.value ?? 18}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 18)}
+                            />
+                          </FormControl>
+                          <FormDescription>Minimum age preference (18-99)</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="maxAgePreference"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Max Age</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={18}
+                              max={99}
+                              {...field}
+                              value={field.value ?? 99}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 99)}
+                            />
+                          </FormControl>
+                          <FormDescription>Maximum age preference (18-99)</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="maxDistance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Max Distance</FormLabel>
+                          <FormControl>
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Radius</span>
+                                <span className="font-medium">{field.value ?? 100} km</span>
+                              </div>
+                              <Slider
+                                value={[field.value ?? 100]}
+                                onValueChange={([v]) => field.onChange(v)}
+                                min={5}
+                                max={500}
+                                step={5}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormDescription>Maximum distance for nearby profiles (5-500 km)</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               </div>
 
