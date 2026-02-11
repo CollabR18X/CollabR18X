@@ -1,6 +1,6 @@
-# CollabR18X on Render
-# Deploy: push to GitHub, then in Render Dashboard: New → Blueprint → connect repo
-# Backend (API) + optional Static Site (frontend). dist/public is created by "npm run build".
+# CollabR18X on Render — single service serves both frontend + API
+# This eliminates CORS issues: the browser calls /api/* on the same domain.
+# Deploy: push to GitHub, then in Render Dashboard: New → Blueprint → connect repo.
 
 databases:
   - name: collabr18x-db
@@ -8,14 +8,16 @@ databases:
     region: oregon
 
 services:
-  # Backend API (Python/FastAPI)
   - type: web
-    name: collabr18x-api
+    name: collabr18x
     runtime: python
     region: oregon
     plan: free
 
-    buildCommand: pip install -r requirements.txt
+    # Build: install Node deps, build frontend into dist/public, then install Python deps
+    buildCommand: |
+      npm install && VITE_BASE=/ npm run build && pip install -r requirements.txt
+
     startCommand: python run.py
 
     envVars:
@@ -29,19 +31,3 @@ services:
         value: production
 
     healthCheckPath: /api/health
-
-  # Frontend (optional – use this if you want to host the site on Render instead of GitHub Pages)
-  - type: web
-    name: collabr18x-web
-    runtime: static
-    region: oregon
-    plan: free
-
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist/public
-
-    envVars:
-      - key: VITE_BASE
-        value: /
-      - key: VITE_API_URL
-        sync: false

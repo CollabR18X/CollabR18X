@@ -15,10 +15,13 @@ const getApiBaseUrl = () => {
   return apiUrl;
 };
 
-/** True if requests will hit a real API (backend URL set, or dev proxy). Used to show "set VITE_API_URL" warning. */
+/** True if requests will hit a real API. Same-origin (no VITE_API_URL) works when frontend+backend share a domain. */
 export const isApiUrlConfigured = (): boolean => {
-  if (import.meta.env.DEV) return true; // dev uses proxy
-  return !!(import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim());
+  if (import.meta.env.DEV) return true; // dev uses Vite proxy
+  // If VITE_API_URL is set, it's explicitly configured
+  if (import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim()) return true;
+  // If not set, assume same-origin (frontend + backend on same domain) — no warning needed
+  return true;
 };
 
 export const getApiUrl = (path: string) => {

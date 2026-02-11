@@ -251,39 +251,41 @@ async def options_api(request: Request, path: str):
 register_routes(app)
 
 
-# Serve static files in production
+# Serve frontend in production (same domain = no CORS needed)
 if not settings.DEBUG:
     static_dir = os.path.join(os.path.dirname(__file__), "..", "dist", "public")
     if not os.path.exists(static_dir):
-        # Fallback to client/dist for development builds
         static_dir = os.path.join(os.path.dirname(__file__), "..", "client", "dist")
     
     if os.path.exists(static_dir):
-        # Serve static assets
+        log(f"Serving frontend from {static_dir}")
+        # Serve /assets (JS, CSS bundles)
         assets_dir = os.path.join(static_dir, "assets")
         if os.path.exists(assets_dir):
             app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
         
-        # Serve SPA for all non-API routes (only GET requests, registered last to not interfere with API)
-        # This must be registered AFTER all API routes to avoid conflicts
+        # SPA catch-all: serve index.html for all non-API GET requests
         @app.get("/{full_path:path}")
         async def serve_spa(full_path: str, request: Request):
-            """Serve SPA for all non-API GET routes"""
-            # Don't interfere with API routes - they should be handled by registered routers
-            # This route only handles GET requests, so POST/PUT/DELETE to /api/* won't reach here
             if full_path.startswith("api/"):
-                # This shouldn't happen for API routes, but just in case
                 return JSONResponse(
                     status_code=404,
                     content={"error": "API route not found", "path": f"/{full_path}"}
                 )
+            # Try serving exact file first (favicon.png, etc.)
+            file_path = os.path.join(static_dir, full_path)
+            if full_path and os.path.isfile(file_path):
+                return FileResponse(file_path)
+            # Otherwise serve SPA index.html (client-side routing handles the path)
             index_path = os.path.join(static_dir, "index.html")
             if os.path.exists(index_path):
                 return FileResponse(index_path)
             return JSONResponse(
                 status_code=404,
-                content={"error": "Not found", "path": f"/{full_path}"}
+                content={"error": "Frontend not built. Run: npm install && npm run build"}
             )
+    else:
+        log(f"WARNING: Frontend not found at {static_dir}. Only API routes will work.")
 
 
 if __name__ == "__main__":
