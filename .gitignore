@@ -53,6 +53,9 @@ build/
 *~
 .DS_Store
 
+# User uploads (profile pictures stored on disk)
+uploads/
+
 # Database
 *.db
 *.sqlite

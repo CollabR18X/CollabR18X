@@ -97,18 +97,47 @@ class ProfileUpdate(BaseModel):
         extra = "allow"  # Allow extra fields
 
 
+@router.get("/profiles")
+async def list_profiles(
+    db: Session = Depends(get_db),
+    _: str = Depends(require_auth),
+):
+    """List visible profiles (for Directory, etc.). Requires auth."""
+    profiles = db.query(Profile).filter(Profile.is_visible == True).limit(100).all()
+    result = []
+    for p in profiles:
+        user = db.query(User).filter(User.id == p.user_id).first()
+        profile_dict = {}
+        for col in Profile.__table__.columns:
+            key = col.name
+            profile_dict[key] = getattr(p, key, None)
+        profile_camel = convert_profile_to_camel_case(profile_dict)
+        result.append({
+            **profile_camel,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "firstName": user.first_name,
+                "lastName": user.last_name,
+                "displayName": getattr(user, "display_name", None),
+                "profileImageUrl": user.profile_image_url,
+            } if user else None,
+        })
+    return result
+
+
 @router.get("/profiles/me")
 async def get_my_profile(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get current user's profile"""
+    """Get current user's profile. Creates profile if missing (e.g. users from before auto-create)."""
     profile = get_profile_by_user_id(db, current_user.id)
     
-    # Return 404 if profile doesn't exist (frontend will handle this)
+    # Lazy-create profile for existing users who registered before auto-create was added
     if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        profile = create_profile(db, current_user.id, {})
     
     user = db.query(User).filter(User.id == profile.user_id).first()
     
@@ -289,7 +318,17 @@ async def update_my_profile(
         try:
             # Update profile first (this will commit the transaction)
             profile = update_profile(db, current_user.id, db_updates)
-            
+
+            # Sync first profile photo to user.profile_image_url (main avatar used in nav, chat, etc.)
+            if "photos" in db_updates:
+                photos_list = db_updates.get("photos") or []
+                if isinstance(photos_list, list) and len(photos_list) > 0 and photos_list[0]:
+                    user_row = db.query(User).filter(User.id == current_user.id).first()
+                    if user_row:
+                        user_row.profile_image_url = photos_list[0]
+                        db.commit()
+                        db.refresh(user_row)
+
             # If display_name was set, commit it in a separate transaction
             # (update_profile already committed, so we're in a new transaction)
             if display_name is not None and hasattr(current_user, 'display_name'):

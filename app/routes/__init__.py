@@ -2,11 +2,12 @@
 API routes
 """
 from fastapi import FastAPI
-from app.routes import auth, profiles, matching, collaboration, community, moderation, support, connections, vault, statistics
+from app.routes import auth, profiles, uploads, matching, collaboration, community, moderation, support, connections, vault, statistics
 
 def register_routes(app: FastAPI):
     """Register all API routes"""
     app.include_router(auth.router, prefix="/api", tags=["auth"])
+    app.include_router(uploads.router, prefix="/api", tags=["uploads"])
     app.include_router(profiles.router, prefix="/api", tags=["profiles"])
     app.include_router(matching.router, prefix="/api", tags=["matching"])
     app.include_router(collaboration.router, prefix="/api", tags=["collaboration"])

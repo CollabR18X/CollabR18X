@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.auth import User
 from app.services.auth_service import create_user, authenticate_user
+from app.services.profile_service import create_profile
 from app.middleware.auth import get_current_user, create_session, delete_session
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -72,7 +73,13 @@ async def register(
         except ValueError as ve:
             # Handle validation errors from create_user
             raise HTTPException(status_code=400, detail=str(ve))
-        
+
+        # Auto-create profile so /api/profiles/me doesn't 404 for new users
+        try:
+            create_profile(db, user.id, {})
+        except Exception as pe:
+            logger.warning(f"Profile creation failed for user {user.id}: {str(pe)}")
+
         # Create session and log in automatically (database-backed)
         try:
             session_id = create_session(db, user.id)

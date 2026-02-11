@@ -64,6 +64,7 @@ export function useUpload(options: UseUploadOptions = {}) {
     async (file: File): Promise<UploadResponse> => {
       const response = await fetch("/api/uploads/request-url", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -76,7 +77,10 @@ export function useUpload(options: UseUploadOptions = {}) {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to get upload URL");
+        let msg = errorData.detail || errorData.error || "Failed to get upload URL";
+        if (Array.isArray(msg) && msg[0]?.msg) msg = msg[0].msg;
+        else if (typeof msg !== "string") msg = String(msg?.message ?? msg ?? "Failed to get upload URL");
+        throw new Error(msg);
       }
 
       return response.json();
@@ -92,6 +96,7 @@ export function useUpload(options: UseUploadOptions = {}) {
       const response = await fetch(uploadURL, {
         method: "PUT",
         body: file,
+        credentials: "include",
         headers: {
           "Content-Type": file.type || "application/octet-stream",
         },
@@ -164,6 +169,7 @@ export function useUpload(options: UseUploadOptions = {}) {
       // Use the actual file properties to request a per-file presigned URL
       const response = await fetch("/api/uploads/request-url", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },

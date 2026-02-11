@@ -250,6 +250,10 @@ async def options_api(request: Request, path: str):
 # Register all routes
 register_routes(app)
 
+# Serve uploaded files at /uploads (always - for both dev and production)
+_upload_dir = os.path.abspath(settings.UPLOAD_DIR)
+os.makedirs(_upload_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_upload_dir), name="uploads")
 
 # Serve frontend in production (same domain = no CORS needed)
 if not settings.DEBUG:

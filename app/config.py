@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # Redirect these hosts to canonical URL (comma-separated). Canonical host is collabr18x.com
     REDIRECT_HOSTS: str = os.getenv("REDIRECT_HOSTS", "collabr18x.onrender.com,collabr18x-web.onrender.com")
     CANONICAL_URL: str = os.getenv("CANONICAL_URL", "https://collabr18x.com")
+
+    # Uploads - local disk storage (use persistent volume on Render for production)
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
     
     # Replit OIDC (optional for local dev)
     ISSUER_URL: Optional[str] = os.getenv("ISSUER_URL", "https://replit.com/oidc")

@@ -46,13 +46,18 @@ export default defineConfig({
     },
     host: "127.0.0.1", // Use localhost for Windows compatibility
     port: 5173,
-    // Proxy API requests to Python backend in development
+    // Proxy API and uploads to Python backend in development
     proxy: {
       "/api": {
         target: "http://127.0.0.1:5000", // Use IPv4 explicitly
         changeOrigin: true,
         secure: false,
         ws: true, // Enable WebSocket proxying
+      },
+      "/uploads": {
+        target: "http://127.0.0.1:5000",
+        changeOrigin: true,
+        secure: false,
       },
     },
   },
