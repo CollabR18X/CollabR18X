@@ -44,6 +44,7 @@ import { CookieConsent } from "@/components/CookieConsent";
 import { Loader2 } from "lucide-react";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { RouteErrorDisplay } from "@/components/RouteErrorDisplay";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function Router() {
   const { user, isLoading } = useAuth();
@@ -97,6 +98,7 @@ function Router() {
     <>
       <Navbar />
       <main className="min-h-[calc(100vh-64px)] bg-background">
+        <ErrorBoundary>
         <Switch>
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/" component={Dashboard} /> {/* Also show dashboard at root */}
@@ -138,6 +140,7 @@ function Router() {
           <Route path="/statistics" component={Statistics} />
           <Route component={NotFound} />
         </Switch>
+        </ErrorBoundary>
       </main>
     </>
   );

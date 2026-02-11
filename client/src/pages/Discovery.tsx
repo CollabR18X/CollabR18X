@@ -11,6 +11,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { SafeProfileImage } from "@/components/SafeProfileImage";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -85,16 +86,18 @@ function ProfileCard({
     <Card className="overflow-hidden border-border/50 hover:shadow-xl hover:border-primary/20 transition-all duration-300 group">
       <div className="h-48 bg-gradient-to-r from-primary/10 to-accent/10 relative overflow-hidden">
         {profile.photos && profile.photos.length > 0 ? (
-          <img
+          <SafeProfileImage
             src={profile.photos[0]}
             alt={profile.user.firstName || "Profile"}
             className="w-full h-full object-cover"
+            fallbackLetter={profile.user.firstName?.[0]}
           />
         ) : profile.user.profileImageUrl ? (
-          <img
+          <SafeProfileImage
             src={profile.user.profileImageUrl}
             alt={profile.user.firstName || "Profile"}
             className="w-full h-full object-cover"
+            fallbackLetter={profile.user.firstName?.[0]}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

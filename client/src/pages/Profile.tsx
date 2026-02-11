@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { SafeProfileImage } from "@/components/SafeProfileImage";
 
 export default function Profile() {
   const [, params] = useRoute("/profile/:id");
@@ -58,45 +59,8 @@ export default function Profile() {
   const [isSavingDisplayName, setIsSavingDisplayName] = useState(false);
   const queryClient = useQueryClient();
 
-  if (isLoadingProfile) return <ProfileSkeleton />;
-  
-  // Handle error cases
-  if (!isMeRoute && error) return <ProfileSkeleton />;
-  
-  // For own profile route, if no profile exists, show a message to create one
-  if (isMeRoute && !myProfile && !isLoadingMyProfile) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Card className="p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">No Profile Found</h2>
-          <p className="text-muted-foreground mb-6">You haven't created your profile yet.</p>
-          <Link href="/profile/me/edit">
-            <Button>Create Profile</Button>
-          </Link>
-        </Card>
-      </div>
-    );
-  }
-  
-  // If profile doesn't exist and not loading, show skeleton
-  if (!profile) return <ProfileSkeleton />;
-
-  // Normalize profile data - myProfile might not have user nested
-  // If we're on the me route, use myProfile and merge with current user data
-  // This ensures we get the latest user data including display_name
-  // Priority: myProfile.user.displayName > user.displayName > fallback
-  const profileData = isMeRoute && myProfile 
-    ? { 
-        ...myProfile, 
-        user: { 
-          ...user!, 
-          displayName: myProfile.user?.displayName || user?.displayName || "" 
-        } 
-      } 
-    : profile;
-
-  // Fetch user posts
-  const userIdToFetch = isMeRoute ? user?.id : profileData?.userId;
+  // All hooks must run before any early return (React hooks rule)
+  const userIdToFetch = isMeRoute ? user?.id : (profile?.userId ?? id ?? 0);
   const { data: userPosts, isLoading: isLoadingPosts } = useQuery({
     queryKey: ["/api/posts/user", userIdToFetch],
     queryFn: async () => {
@@ -109,16 +73,7 @@ export default function Profile() {
     },
     enabled: !!userIdToFetch,
   });
-  const userPostsCount = userPosts?.length || 0;
-  
-  // Get profile URL for sharing (canonical host collabr18x.com)
-  const profileUrl = isMeRoute 
-    ? sitePath("/profile/me")
-    : id 
-    ? sitePath(`/profile/${id}`)
-    : "";
 
-  // Update display name mutation
   const updateDisplayNameMutation = useMutation({
     mutationFn: async (displayName: string) => {
       const response = await fetch("/api/profiles/me", {
@@ -179,6 +134,31 @@ export default function Profile() {
       });
     },
   });
+
+  const hasConsent = useConsentCheck(profile?.userId || "");
+
+  if (isLoadingProfile) return <ProfileSkeleton />;
+  if (!isMeRoute && error) return <ProfileSkeleton />;
+  if (isMeRoute && !myProfile && !isLoadingMyProfile) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="p-8 text-center">
+          <h2 className="text-2xl font-bold mb-4">No Profile Found</h2>
+          <p className="text-muted-foreground mb-6">You haven't created your profile yet.</p>
+          <Link href="/profile/me/edit">
+            <Button>Create Profile</Button>
+          </Link>
+        </Card>
+      </div>
+    );
+  }
+  if (!profile) return <ProfileSkeleton />;
+
+  const profileData = isMeRoute && myProfile
+    ? { ...myProfile, user: { ...user!, displayName: myProfile.user?.displayName || user?.displayName || "" } }
+    : profile;
+  const profileUrl = isMeRoute ? sitePath("/profile/me") : id ? sitePath(`/profile/${id}`) : "";
+  const userPostsCount = userPosts?.length || 0;
 
   const handleSaveDisplayName = () => {
     if (editingDisplayName.trim() === (profileData.user?.displayName || "")) {
@@ -241,8 +221,6 @@ export default function Profile() {
     }
   };
   
-  const hasConsent = useConsentCheck(profileData?.userId || '');
-
   const handleBlock = () => {
     if (profileData?.userId) {
       blockUser(profileData.userId, {
@@ -324,10 +302,11 @@ export default function Profile() {
                 <div className="relative flex flex-col items-center md:items-start">
                   {profileData.user?.profileImageUrl ? (
                     <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-[6px] border-card shadow-lg overflow-hidden">
-                      <img 
-                        src={profileData.user.profileImageUrl} 
-                        alt={profileData.user?.firstName || ""} 
-                        className="w-full h-full object-cover object-center"
+                      <SafeProfileImage
+                        src={profileData.user.profileImageUrl}
+                        alt={profileData.user?.firstName || ""}
+                        className="w-full h-full object-cover object-center rounded-full"
+                        fallbackLetter={profileData.user?.firstName?.[0]}
                       />
                     </div>
                   ) : (
@@ -874,9 +853,9 @@ export default function Profile() {
                         <h3 className="font-semibold mb-4">Photos</h3>
                         <div className="grid grid-cols-2 gap-4">
                           {profileData.photos.map((photo: string, idx: number) => (
-                            <img 
-                              key={idx} 
-                              src={photo} 
+                            <SafeProfileImage
+                              key={idx}
+                              src={photo}
                               alt={`Photo ${idx + 1}`}
                               className="w-full h-32 object-cover rounded-lg"
                             />

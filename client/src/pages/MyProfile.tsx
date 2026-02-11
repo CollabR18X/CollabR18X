@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Slider } from "@/components/ui/slider";
+import { SafeProfileImage } from "@/components/SafeProfileImage";
 
 export default function MyProfile() {
   const { user } = useAuth();
@@ -414,12 +415,11 @@ export default function MyProfile() {
         <CardContent>
           <div className="flex flex-wrap gap-4">
             {photos.map((photo, index) => (
-              <div key={index} className="relative group">
-                <img
+              <div key={index} className="relative group" data-testid={`img-profile-photo-${index}`}>
+                <SafeProfileImage
                   src={photo}
                   alt={`Profile photo ${index + 1}`}
                   className="w-24 h-24 rounded-lg object-cover border"
-                  data-testid={`img-profile-photo-${index}`}
                 />
                 <button
                   type="button"
