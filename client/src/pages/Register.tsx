@@ -28,7 +28,6 @@ export default function Register() {
   const signupMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; first_name: string; last_name: string }) => {
       const apiUrl = getApiUrl("/api/auth/register");
-      console.log("Registration attempt - API URL:", apiUrl);
       
       try {
         const response = await fetch(apiUrl, {
@@ -38,17 +37,13 @@ export default function Register() {
           credentials: "include",
         });
 
-        console.log("Registration response status:", response.status, response.statusText);
-
         if (!response.ok) {
           let errorMessage = "Registration failed";
           try {
             const errorData = await response.json();
-            console.error("Registration error data:", errorData);
             errorMessage = errorData.detail || errorData.message || `Registration failed: ${response.status} ${response.statusText}`;
-          } catch (parseError) {
+          } catch {
             const text = await response.text().catch(() => "");
-            console.error("Registration error (non-JSON):", text);
             errorMessage = `Registration failed: ${response.status} ${response.statusText}${text ? ` - ${text}` : ""}`;
           }
           const err = new Error(errorMessage) as Error & { status?: number; url?: string };
@@ -58,10 +53,8 @@ export default function Register() {
         }
 
         const result = await response.json();
-        console.log("Registration successful:", result);
         return result;
       } catch (error: unknown) {
-        console.error("Registration error:", error);
         const err = error as Error & { status?: number; url?: string };
         // Network or 404 usually means API URL not set or backend down
         if (err instanceof TypeError && err.message?.includes("fetch")) {

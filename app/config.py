@@ -3,7 +3,7 @@ Application configuration
 """
 import os
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, computed_field
 from typing import Optional
 
 
@@ -50,6 +50,14 @@ class Settings(BaseSettings):
     # Replit OIDC (optional for local dev)
     ISSUER_URL: Optional[str] = os.getenv("ISSUER_URL", "https://replit.com/oidc")
     REPL_ID: Optional[str] = os.getenv("REPL_ID")
+
+    @computed_field
+    @property
+    def SECURE_COOKIES(self) -> bool:
+        raw = os.getenv("SECURE_COOKIES")
+        if raw is not None:
+            return raw.lower() in ("true", "1", "yes")
+        return not self.DEBUG  # Secure in production, not in dev
     
     class Config:
         env_file = ".env"
@@ -58,3 +66,10 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Fail fast in production if default session secret is used
+_DEFAULT_SECRET = "your-secret-key-change-this-in-production"
+if not settings.DEBUG and settings.SESSION_SECRET == _DEFAULT_SECRET:
+    import sys
+    print("FATAL: Set SESSION_SECRET in production. Do not use the default value.", file=sys.stderr)
+    sys.exit(1)

@@ -2,6 +2,8 @@
 Main FastAPI application entry point
 """
 import os
+from urllib.parse import urlparse
+from pathlib import Path
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -12,6 +14,8 @@ import uvicorn
 from datetime import datetime
 import logging
 
+from slowapi.errors import RateLimitExceeded
+from app.limiter import limiter
 from app.database import init_db, Base, engine
 from app.routes import register_routes
 from app.config import settings
@@ -64,6 +68,16 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests. Please try again later."},
+    )
+
 
 # CORS: allow requests from frontend domain and localhost
 allowed_origins = [
@@ -92,27 +106,57 @@ app.add_middleware(
     same_site="lax"
 )
 
-# CORS middleware
+# CORS middleware - restrict headers to what we need
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(allowed_origins),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
+    expose_headers=["Content-Length"],
 )
 
 
 def _origin_allowed(origin: str) -> bool:
+    """Strict origin check: exact list or collabr18x.com / www.collabr18x.com only."""
     if not origin:
         return False
     o = origin.strip().rstrip("/")
     if o in _allowed_origins_set:
         return True
-    # Allow collabr18x.com and subdomains (e.g. www)
-    if "collabr18x.com" in o and (o.startswith("https://") or o.startswith("http://")):
-        return True
+    # Allow only collabr18x.com and www subdomain (not evil-collabr18x.com.evil.com)
+    try:
+        parsed = urlparse(o)
+        host = parsed.netloc.lower().split(":")[0]
+        if host in ("collabr18x.com", "www.collabr18x.com"):
+            return o.startswith("https://") or (o.startswith("http://") and settings.DEBUG)
+    except Exception:
+        pass
     return False
+
+
+# Security headers
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if not settings.DEBUG:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    # CSP - allow self, fonts, and common asset sources
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'"
+    )
+    response.headers["Content-Security-Policy"] = csp
+    return response
 
 
 # CORS: run first (add last) so OPTIONS preflight gets 200 with headers before anything else
@@ -127,7 +171,7 @@ async def cors_headers_middleware(request: Request, call_next):
                 headers={
                     "Access-Control-Allow-Origin": origin,
                     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
                     "Access-Control-Allow-Credentials": "true",
                     "Access-Control-Max-Age": "86400",
                 },
@@ -240,7 +284,7 @@ async def options_api(request: Request, path: str):
         headers={
             "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
             "Access-Control-Allow-Credentials": "true",
             "Access-Control-Max-Age": "86400",
         },
@@ -269,6 +313,9 @@ if not settings.DEBUG:
             app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
         
         # SPA catch-all: serve index.html for all non-API GET requests
+        _static_dir_abs = os.path.abspath(static_dir)
+        _static_dir_resolved = str(Path(_static_dir_abs).resolve())
+
         @app.get("/{full_path:path}")
         async def serve_spa(full_path: str, request: Request):
             if full_path.startswith("api/"):
@@ -276,12 +323,15 @@ if not settings.DEBUG:
                     status_code=404,
                     content={"error": "API route not found", "path": f"/{full_path}"}
                 )
-            # Try serving exact file first (favicon.png, etc.)
-            file_path = os.path.join(static_dir, full_path)
-            if full_path and os.path.isfile(file_path):
-                return FileResponse(file_path)
+            # Try serving exact file first (favicon.png, etc.) - prevent path traversal
+            joined = os.path.normpath(os.path.join(_static_dir_abs, full_path))
+            resolved = str(Path(joined).resolve())
+            if not resolved.startswith(_static_dir_resolved + os.sep) and resolved != _static_dir_resolved:
+                return JSONResponse(status_code=403, content={"error": "Forbidden"})
+            if full_path and os.path.isfile(resolved):
+                return FileResponse(resolved)
             # Otherwise serve SPA index.html (client-side routing handles the path)
-            index_path = os.path.join(static_dir, "index.html")
+            index_path = os.path.join(_static_dir_abs, "index.html")
             if os.path.exists(index_path):
                 return FileResponse(index_path)
             return JSONResponse(

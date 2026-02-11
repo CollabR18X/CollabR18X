@@ -24,6 +24,7 @@ router = APIRouter()
 _upload_tokens: dict[str, dict] = {}
 _TOKEN_TTL = 300  # 5 minutes
 _ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
+_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 _MAX_SIZE = 5 * 1024 * 1024  # 5MB
 
 
@@ -110,7 +111,9 @@ async def request_upload_url(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     ext = _clean_filename(body.name)
-    content_type = body.contentType or "image/jpeg"
+    content_type = (body.contentType or "image/jpeg").split(";")[0].strip()
+    if content_type not in _ALLOWED_CONTENT_TYPES:
+        content_type = "image/jpeg"
     if body.size and body.size > _MAX_SIZE:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB.")
 
